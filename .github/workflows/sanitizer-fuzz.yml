@@ -19,6 +19,14 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
+      - name: Checkout seed corpus
+        uses: actions/checkout@v7
+        with:
+          repository: Z3Prover/z3test
+          ref: 9514d618dc27795b6422cf543c992edfe5259681
+          path: z3test
+          persist-credentials: false
+
       - name: Validate evidence key
         env:
           EVIDENCE_KEY: ${{ secrets.FUZZ_EVIDENCE_KEY }}
@@ -52,7 +60,7 @@ jobs:
       - name: Prepare seed corpus
         run: |
           mkdir -p corpus findings
-          find examples src/test -type f \( -name '*.smt2' -o -name '*.smt' \) -print0 |
+          find examples src/test z3test -type f \( -name '*.smt2' -o -name '*.smt' \) -print0 |
             head -z -n 1000 |
             xargs -0 -r -I '{}' cp --backup=numbered '{}' corpus/
 
