@@ -44,7 +44,17 @@ jobs:
           fi
           printf '%s' "$REPRO_B64" | base64 --decode > "$RUNNER_TEMP/repro.smt2"
           unset REPRO_B64
+          set +e
           for attempt in 1 2 3 4 5; do
-            echo "Validation attempt $attempt"
-            build/research/z3 "$RUNNER_TEMP/repro.smt2"
+            log="$RUNNER_TEMP/repro-$attempt.log"
+            build/research/z3 "$RUNNER_TEMP/repro.smt2" >"$log" 2>&1
+            status=$?
+            if [ "$status" -eq 0 ] || ! grep -Eq 'AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:' "$log"; then
+              echo "Private sanitizer validation did not reproduce on attempt $attempt."
+              rm -f "$log" "$RUNNER_TEMP/repro.smt2"
+              exit 1
+            fi
+            rm -f "$log"
           done
+          rm -f "$RUNNER_TEMP/repro.smt2"
+          echo "Private sanitizer signature confirmed in 5 of 5 attempts."
