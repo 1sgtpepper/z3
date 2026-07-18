@@ -16,6 +16,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 
     std::string input(reinterpret_cast<const char*>(data), size);
     Z3_config config = Z3_mk_config();
+    Z3_set_param_value(config, "timeout", "1000");
     Z3_context context = Z3_mk_context(config);
     Z3_del_config(config);
     Z3_set_error_handler(context, ignore_error);
