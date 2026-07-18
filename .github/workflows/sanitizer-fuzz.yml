@@ -1,0 +1,105 @@
+name: Sanitizer fuzz
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: Fuzzing duration in seconds
+        required: false
+        default: "3600"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Validate evidence key
+        env:
+          EVIDENCE_KEY: ${{ secrets.FUZZ_EVIDENCE_KEY }}
+        run: test -n "$EVIDENCE_KEY"
+
+      - name: Configure sanitizer build
+        env:
+          CC: clang
+          CXX: clang++
+        run: >-
+          cmake -S . -B build-fuzz -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DZ3_BUILD_LIBZ3_SHARED=OFF
+          -DZ3_BUILD_EXECUTABLE=OFF
+          -DZ3_BUILD_TEST_EXECUTABLES=OFF
+          -DZ3_BUILD_PYTHON_BINDINGS=OFF
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined,fuzzer-no-link -fno-omit-frame-pointer"
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined,fuzzer-no-link -fno-omit-frame-pointer"
+
+      - name: Build instrumented library
+        run: cmake --build build-fuzz --target libz3 --parallel 4
+
+      - name: Build fuzz target
+        run: >-
+          clang++ -std=c++20 -O1 -g
+          -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer
+          -Isrc/api .github/security-research/smt2_fuzzer.cpp
+          build-fuzz/libz3.a -lpthread -ldl
+          -o build-fuzz/smt2-fuzzer
+
+      - name: Prepare seed corpus
+        run: |
+          mkdir -p corpus findings
+          find examples src/test -type f \( -name '*.smt2' -o -name '*.smt' \) -print0 |
+            head -z -n 1000 |
+            xargs -0 -r -I '{}' cp --backup=numbered '{}' corpus/
+
+      - name: Run fuzz target privately
+        id: run
+        env:
+          DURATION: ${{ inputs.duration }}
+        run: |
+          set +e
+          ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+          UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+            build-fuzz/smt2-fuzzer corpus \
+              -artifact_prefix=findings/ \
+              -max_total_time="$DURATION" \
+              -timeout=10 -rss_limit_mb=4096 \
+              -workers=2 -jobs=2 \
+              > findings/run.log 2>&1
+          status=$?
+          printf '%s\n' "$status" > findings/status
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Encrypt private evidence
+        env:
+          EVIDENCE_KEY: ${{ secrets.FUZZ_EVIDENCE_KEY }}
+        run: |
+          tar -czf evidence.tar.gz findings
+          openssl enc -aes-256-cbc -salt -pbkdf2 \
+            -in evidence.tar.gz -out evidence.tar.gz.enc \
+            -pass env:EVIDENCE_KEY
+          rm -rf evidence.tar.gz findings corpus
+
+      - name: Upload encrypted evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-evidence
+          path: evidence.tar.gz.enc
+          retention-days: 1
+          if-no-files-found: error
+
+      - name: Report generic outcome
+        env:
+          STATUS: ${{ steps.run.outputs.status }}
+        run: |
+          if test "$STATUS" -eq 0; then
+            echo "Fuzzing completed without a sanitizer finding."
+          else
+            echo "Fuzzing stopped early; inspect the encrypted evidence privately."
+            exit 1
+          fi
