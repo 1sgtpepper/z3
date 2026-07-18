@@ -1,0 +1,50 @@
+name: Isolated sanitizer validation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ASAN_OPTIONS: abort_on_error=1:detect_leaks=0:halt_on_error=1:print_stacktrace=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Configure sanitizer build
+        run: |
+          cmake -S . -B build/research -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DZ3_BUILD_TEST_EXECUTABLES=OFF
+
+      - name: Build command-line solver
+        run: cmake --build build/research --target z3 --parallel 2
+
+      - name: Run negative control
+        run: printf '(check-sat)\n' | build/research/z3 -in
+
+      - name: Run private reproducer when configured
+        env:
+          REPRO_B64: ${{ secrets.REPRO_B64 }}
+        run: |
+          if [ -z "$REPRO_B64" ]; then
+            echo "No private reproducer configured; sanitizer build and negative control passed."
+            exit 0
+          fi
+          printf '%s' "$REPRO_B64" | base64 --decode > "$RUNNER_TEMP/repro.smt2"
+          unset REPRO_B64
+          for attempt in 1 2 3 4 5; do
+            echo "Validation attempt $attempt"
+            build/research/z3 "$RUNNER_TEMP/repro.smt2"
+          done
