@@ -33,6 +33,7 @@ jobs:
             build/libz3.a
             build/*.so
             build/*.a
+            build/python
           key: z3-build-${{ runner.os }}-${{ github.sha }}
           restore-keys: |
             z3-build-${{ runner.os }}-
