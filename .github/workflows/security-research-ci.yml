@@ -28,8 +28,8 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
             -DZ3_BUILD_TEST_EXECUTABLES=OFF
 
-      - name: Build command-line solver
-        run: cmake --build build/research --target z3 --parallel 2
+      - name: Build command-line solver and public library
+        run: cmake --build build/research --target z3 libz3 --parallel 4
 
       - name: Run negative control
         run: printf '(check-sat)\n' | build/research/z3 -in
