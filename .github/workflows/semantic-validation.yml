@@ -37,12 +37,21 @@ jobs:
           restore-keys: |
             z3-build-${{ runner.os }}-
 
+      - name: Check restored solver
+        id: restored-z3
+        run: |
+          if test -x build/z3; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure fallback build
-        if: steps.cache-z3.outputs.cache-hit != 'true'
+        if: steps.restored-z3.outputs.available != 'true'
         run: python3 scripts/mk_make.py
 
       - name: Build command-line solver when uncached
-        if: steps.cache-z3.outputs.cache-hit != 'true'
+        if: steps.restored-z3.outputs.available != 'true'
         run: make -C build -j4
 
       - name: Restore private campaign
