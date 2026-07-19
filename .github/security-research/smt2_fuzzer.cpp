@@ -44,15 +44,11 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
             if (Z3_get_error_code(context) == Z3_OK)
                 (void)Z3_solver_check(context, solver);
             break;
-        case 2: {
-            Z3_context target = make_context();
-            Z3_solver translated = Z3_solver_translate(context, solver, target);
-            Z3_solver_inc_ref(target, translated);
-            (void)Z3_solver_check(target, translated);
-            Z3_solver_dec_ref(target, translated);
-            Z3_del_context(target);
+        case 2:
+            (void)Z3_solver_get_statistics(context, solver);
+            if (result == Z3_L_UNDEF)
+                (void)Z3_solver_get_reason_unknown(context, solver);
             break;
-        }
         case 3:
             (void)Z3_solver_get_assertions(context, solver);
             (void)Z3_solver_to_string(context, solver);
