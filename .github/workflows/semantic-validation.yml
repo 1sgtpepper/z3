@@ -58,10 +58,16 @@ jobs:
       - name: Restore private campaign
         env:
           CAMPAIGN_B64: ${{ secrets.SEMANTIC_CAMPAIGN_B64 }}
+          INPUT_B64: ${{ secrets.SEMANTIC_INPUT_B64 }}
         run: |
           test -n "$CAMPAIGN_B64"
           printf '%s' "$CAMPAIGN_B64" | base64 --decode > "$RUNNER_TEMP/campaign.py"
           unset CAMPAIGN_B64
+          if test -n "$INPUT_B64"; then
+            printf '%s' "$INPUT_B64" | base64 --decode > "$RUNNER_TEMP/campaign-input"
+            echo "CAMPAIGN_INPUT=$RUNNER_TEMP/campaign-input" >> "$GITHUB_ENV"
+          fi
+          unset INPUT_B64
           python3 -m py_compile "$RUNNER_TEMP/campaign.py"
 
       - name: Run bounded semantic oracle
@@ -91,7 +97,8 @@ jobs:
             -in "$RUNNER_TEMP/evidence.tar.gz" \
             -out semantic-evidence.tar.gz.enc \
             -pass env:EVIDENCE_KEY
-          rm -rf "$RUNNER_TEMP/campaign.py" "$RUNNER_TEMP/__pycache__" \
+          rm -rf "$RUNNER_TEMP/campaign.py" "$RUNNER_TEMP/campaign-input" \
+            "$RUNNER_TEMP/__pycache__" \
             "$RUNNER_TEMP/evidence" "$RUNNER_TEMP/evidence.tar.gz"
 
       - name: Upload encrypted evidence
