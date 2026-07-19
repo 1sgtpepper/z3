@@ -32,6 +32,12 @@ jobs:
           EVIDENCE_KEY: ${{ secrets.FUZZ_EVIDENCE_KEY }}
         run: test -n "$EVIDENCE_KEY"
 
+      - name: Restore instrumented build cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: build-fuzz
+          key: sanitizer-fuzz-${{ runner.os }}-${{ hashFiles('src/**', 'cmake/**', 'CMakeLists.txt') }}
+
       - name: Configure sanitizer build
         env:
           CC: clang
