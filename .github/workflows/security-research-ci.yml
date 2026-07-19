@@ -53,7 +53,8 @@ jobs:
 
           if ! clang++ -std=c++20 \
             -fsanitize=address,undefined -fno-omit-frame-pointer \
-            -Isrc/api "$RUNNER_TEMP/repro.cpp" build/research/libz3.a \
+            -Isrc/api "$RUNNER_TEMP/repro.cpp" -Lbuild/research -lz3 \
+            -Wl,-rpath,"$PWD/build/research" \
             -lpthread -ldl -o "$RUNNER_TEMP/repro" \
             >"$RUNNER_TEMP/compile.log" 2>&1; then
             rm -f "$RUNNER_TEMP/compile.log"
