@@ -11,6 +11,10 @@ on:
         description: Deterministic campaign seed
         required: false
         default: "7190117"
+      source_revision:
+        description: Optional source commit to build
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -23,8 +27,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Select requested source revision
+        if: inputs.source_revision != ''
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          [[ "$SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          git checkout --detach "$SOURCE_REVISION"
+
       - name: Restore command-line solver cache
         id: cache-z3
+        if: inputs.source_revision == ''
         uses: actions/cache@v6.1.0
         with:
           path: |
@@ -40,8 +53,10 @@ jobs:
 
       - name: Check restored solver
         id: restored-z3
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
         run: |
-          if test -x build/z3; then
+          if test -z "$SOURCE_REVISION" && test -x build/z3; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
