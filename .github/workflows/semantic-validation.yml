@@ -23,15 +23,27 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - name: Configure release build
-        run: >-
-          cmake -S . -B build/semantic -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DZ3_BUILD_TEST_EXECUTABLES=OFF
-          -DZ3_BUILD_PYTHON_BINDINGS=OFF
+      - name: Restore command-line solver cache
+        id: cache-z3
+        uses: actions/cache@v6.1.0
+        with:
+          path: |
+            build/z3
+            build/libz3.so
+            build/libz3.a
+            build/*.so
+            build/*.a
+          key: z3-build-${{ runner.os }}-${{ github.sha }}
+          restore-keys: |
+            z3-build-${{ runner.os }}-
 
-      - name: Build command-line solver
-        run: cmake --build build/semantic --target z3 --parallel 4
+      - name: Configure fallback build
+        if: steps.cache-z3.outputs.cache-hit != 'true'
+        run: python3 scripts/mk_make.py
+
+      - name: Build command-line solver when uncached
+        if: steps.cache-z3.outputs.cache-hit != 'true'
+        run: make -C build -j4
 
       - name: Restore private campaign
         env:
@@ -51,7 +63,7 @@ jobs:
           set +e
           mkdir -p "$RUNNER_TEMP/evidence"
           python3 "$RUNNER_TEMP/campaign.py" \
-            --z3 "$PWD/build/semantic/z3" \
+            --z3 "$PWD/build/z3" \
             --output "$RUNNER_TEMP/evidence" \
             --seconds "$DURATION" \
             --seed "$SEED"
