@@ -34,7 +34,7 @@ jobs:
       - name: Run negative control
         run: printf '(check-sat)\n' | build/research/z3 -in
 
-      - name: Run private reproducer when configured
+      - name: Run private C API reproducer when configured
         env:
           REPRO_B64: ${{ secrets.REPRO_B64 }}
         run: |
@@ -42,19 +42,45 @@ jobs:
             echo "No private reproducer configured; sanitizer build and negative control passed."
             exit 0
           fi
-          printf '%s' "$REPRO_B64" | base64 --decode > "$RUNNER_TEMP/repro.smt2"
+          printf '%s' "$REPRO_B64" | base64 --decode > "$RUNNER_TEMP/repro.cpp"
           unset REPRO_B64
+
+          cleanup() {
+            rm -f "$RUNNER_TEMP"/repro "$RUNNER_TEMP"/repro.cpp \
+              "$RUNNER_TEMP"/repro-*.log "$RUNNER_TEMP"/control-*.log
+          }
+          trap cleanup EXIT
+
+          if ! clang++ -std=c++20 \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -Isrc/api "$RUNNER_TEMP/repro.cpp" build/research/libz3.a \
+            -lpthread -ldl -o "$RUNNER_TEMP/repro" \
+            >"$RUNNER_TEMP/compile.log" 2>&1; then
+            rm -f "$RUNNER_TEMP/compile.log"
+            echo "Private reproducer did not compile."
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/compile.log"
+
           set +e
+          "$RUNNER_TEMP/repro" valid-poly >"$RUNNER_TEMP/control-valid.log" 2>&1
+          valid_status=$?
+          "$RUNNER_TEMP/repro" excess-mono >"$RUNNER_TEMP/control-invalid.log" 2>&1
+          invalid_status=$?
+          if [ "$valid_status" -ne 0 ] || [ "$invalid_status" -ne 0 ] || \
+             grep -Eq 'AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:' \
+               "$RUNNER_TEMP"/control-*.log; then
+            echo "Private negative control failed."
+            exit 1
+          fi
+
           for attempt in 1 2 3 4 5; do
             log="$RUNNER_TEMP/repro-$attempt.log"
-            build/research/z3 "$RUNNER_TEMP/repro.smt2" >"$log" 2>&1
+            "$RUNNER_TEMP/repro" excess-poly >"$log" 2>&1
             status=$?
             if [ "$status" -eq 0 ] || ! grep -Eq 'AddressSanitizer|UndefinedBehaviorSanitizer|runtime error:' "$log"; then
               echo "Private sanitizer validation did not reproduce on attempt $attempt."
-              rm -f "$log" "$RUNNER_TEMP/repro.smt2"
               exit 1
             fi
-            rm -f "$log"
           done
-          rm -f "$RUNNER_TEMP/repro.smt2"
           echo "Private sanitizer signature confirmed in 5 of 5 attempts."
