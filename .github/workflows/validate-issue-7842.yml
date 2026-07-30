@@ -31,4 +31,6 @@ jobs:
           (assert (fp.isNaN (getFlt_1 x)))
           (check-sat)
           EOF
-          test "$(build/z3 model_validate=true issue-7842.smt2)" = unsat
+          result="$(build/z3 model_validate=true issue-7842.smt2)"
+          printf '%s\n' "$result"
+          test "$result" = unsat
