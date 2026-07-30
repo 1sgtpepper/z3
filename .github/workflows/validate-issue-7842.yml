@@ -1,0 +1,32 @@
+name: Validate issue 7842
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Build Z3
+        run: |
+          python scripts/mk_make.py -d
+          make -C build -j2
+      - name: Check the reported formula
+        run: |
+          cat > issue-7842.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (getFlt_1 (_ FloatingPoint 8 24)))))
+          (declare-fun x () Expr)
+          (assert (distinct x (Flt (_ NaN 8 24))))
+          (assert (fp.isNaN (getFlt_1 x)))
+          (check-sat)
+          EOF
+          test "$(build/z3 model_validate=true issue-7842.smt2)" = unsat
