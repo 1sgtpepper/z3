@@ -1,6 +1,8 @@
 name: Validate issue 7842
 
 on:
+  push:
+    branches: [validate-issue-7842-current]
   workflow_dispatch:
 
 permissions:
