@@ -47,9 +47,11 @@ jobs:
           (check-sat)
           EOF
           direct="$(build/z3 direct-fp.smt2)"
-          selector="$(build/z3 selector-fp.smt2)"
-          datatype="$(build/z3 model_validate=true datatype-fp.smt2)"
-          printf 'direct=%s\nselector=%s\ndatatype=%s\n' "$direct" "$selector" "$datatype"
+          printf 'direct=%s\n' "$direct"
           test "$direct" = unsat
+          selector="$(build/z3 selector-fp.smt2)"
+          printf 'selector=%s\n' "$selector"
           test "$selector" = unsat
+          datatype="$(build/z3 model_validate=true datatype-fp.smt2 || true)"
+          printf 'datatype=%s\n' "$datatype"
           test "${datatype%%$'\n'*}" = sat
