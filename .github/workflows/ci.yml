@@ -220,6 +220,12 @@ jobs:
           grep -n -E -C 5 'BEFORE|AFTER|unsupported operator|func:|DIV =|converting|converted term|fp.div|bvudiv0|bvudiv_i|smt context|smt kernel|smt tactic' .z3-trace || true
           tail -200 .z3-trace
 
+      - name: Probe explicit qffp lowering
+        run: |
+          sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
+            sed 's/(check-sat)/(check-sat-using qffp)/' |
+            build/z3 model=true model_validate=false -st /dev/stdin
+
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
 
