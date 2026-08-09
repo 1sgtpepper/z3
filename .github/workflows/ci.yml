@@ -211,7 +211,7 @@ jobs:
       - name: Debug wide division without model validation
         run: |
           { cat z3test/regressions/smt2/10175-wide.smt2; echo '(get-info :reason-unknown)'; } |
-            build/z3 model=false model_validate=false /dev/stdin
+            build/z3 model=false model_validate=false -st /dev/stdin
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
