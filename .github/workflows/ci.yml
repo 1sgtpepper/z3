@@ -209,7 +209,10 @@ jobs:
           git -C z3test checkout 91a7901
 
       - name: Debug wide division without model validation
-        run: build/z3 model_validate=false z3test/regressions/smt2/10175-wide.smt2
+        run: |
+          build/z3 model=false model_validate=false z3test/regressions/smt2/10175-wide.smt2
+          { cat z3test/regressions/smt2/10175-wide.smt2; echo '(get-info :reason-unknown)'; } |
+            build/z3 model=false model_validate=false -
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
