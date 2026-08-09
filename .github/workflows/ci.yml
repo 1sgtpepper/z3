@@ -222,9 +222,12 @@ jobs:
 
       - name: Probe explicit qffp lowering
         run: |
-          sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
-            sed 's/(check-sat)/(check-sat-using qffp)/' |
-            build/z3 model=true model_validate=false -st /dev/stdin
+          { sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
+              sed 's/(check-sat)/(check-sat-using qffp)/';
+            echo '(get-info :reason-unknown)'; } |
+            build/z3 model=true model_validate=false -v:2 -tr:check_sat_using -tr:tactic2solver -tr:fpa2bv -tr:fpa2bv_rw -tr:fpa2bv_div -tr:goal2sat -tr:inc_sat_solver -tr:smt_tactic_detail -st /dev/stdin
+          grep -n -E -C 5 'BEFORE|AFTER|unsupported operator|func:|DIV =|exception|reason|converted term|fp.div|bvudiv0|bvudiv_i|goal2sat|tactic2solver|smt tactic' .z3-trace || true
+          tail -200 .z3-trace
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
