@@ -216,7 +216,8 @@ jobs:
       - name: Trace first wide division atomization
         run: |
           sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
-            build/z3 model=true model_validate=false -v:2 -tr:inc_sat_solver.sat /dev/stdin
+            build/z3 model=true model_validate=false -v:2 -tr:sat /dev/stdin
+          cat .z3-trace
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
