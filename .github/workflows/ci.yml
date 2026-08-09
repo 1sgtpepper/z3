@@ -67,7 +67,7 @@ jobs:
         if: matrix.runRegressions
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Run regressions
         if: matrix.runRegressions
@@ -206,7 +206,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Diagnose wide division solver routing
         run: |
@@ -309,7 +309,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -429,7 +429,7 @@ jobs:
         if: matrix.runTests
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Run regressions
         if: matrix.runTests
@@ -469,7 +469,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -594,7 +594,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 34867ef
+          git -C z3test checkout d50b864
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
