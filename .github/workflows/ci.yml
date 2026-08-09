@@ -182,7 +182,7 @@ jobs:
         run: opam install zarith ocamlfind -y
 
       - name: Configure
-        run: eval `opam config env`; python scripts/mk_make.py --ml
+        run: eval `opam config env`; python scripts/mk_make.py --ml --trace
 
       - name: Build
         run: |
