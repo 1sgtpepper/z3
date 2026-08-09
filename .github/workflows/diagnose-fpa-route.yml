@@ -20,7 +20,7 @@ jobs:
         run: python scripts/mk_make.py
 
       - name: Build Z3
-        run: make -C build -j2
+        run: make -C build -j"$(nproc)"
 
       - name: Checkout exact regression head
         run: |
