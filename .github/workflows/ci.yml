@@ -212,18 +212,23 @@ jobs:
         run: |
           set +e
           for mode in default fpa2bv qffp; do
-            echo "=== $mode (model_validate=false) ==="
+            echo "=== $mode (full 10175-wide, model_validate=false) ==="
             if test "$mode" = default; then
-              sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2
+              sed -n '1,$p' z3test/regressions/smt2/10175-wide.smt2
             elif test "$mode" = fpa2bv; then
-              sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
-                sed 's/(check-sat)/(check-sat-using (then fpa2bv smt))/'
+              sed 's/(check-sat)/(check-sat-using (then fpa2bv smt))/' \
+                z3test/regressions/smt2/10175-wide.smt2
             else
-              sed -n '1,10p' z3test/regressions/smt2/10175-wide.smt2 |
-                sed 's/(check-sat)/(check-sat-using qffp)/'
+              sed 's/(check-sat)/(check-sat-using qffp)/' \
+                z3test/regressions/smt2/10175-wide.smt2
             fi | { cat; echo '(get-info :reason-unknown)'; } |
-              build/z3 model=true model_validate=false -st /dev/stdin
+              build/z3 -v:10 model=true model_validate=false -st /dev/stdin 2>&1
           done
+          echo '=== single FP(2,8) query without push/pop ==='
+          {
+            sed -n '1,2p' z3test/regressions/smt2/10175-wide.smt2
+            sed -n '4,9p' z3test/regressions/smt2/10175-wide.smt2
+          } | build/z3 -v:10 model=true model_validate=false -st /dev/stdin 2>&1
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
