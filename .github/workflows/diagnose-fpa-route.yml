@@ -1,6 +1,8 @@
 name: Diagnose FPA route
 
 on:
+  push:
+    branches: [validate-fpa-division-widths-final]
   workflow_dispatch:
 
 permissions:
