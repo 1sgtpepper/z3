@@ -1,0 +1,16 @@
+{
+  "cases": 11,
+  "format": {
+    "ebits": 4,
+    "sbits": 3
+  },
+  "rounding_checks": 55,
+  "rounding_modes": [
+    "RNE",
+    "RNA",
+    "RTP",
+    "RTN",
+    "RTZ"
+  ],
+  "verdict": "PASS"
+}
