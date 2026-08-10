@@ -4268,8 +4268,7 @@ void fpa2bv_converter::round(sort * s, expr_ref & rm, expr_ref & sgn, expr_ref &
     // width, but give the cap comparison its own minimal unsigned workspace.
     unsigned sigma_cap_size = log2(sbits + 2) + 1;
     unsigned sigma_count_size = sigma_size;
-    if (sigma_count_size < sigma_cap_size)
-        sigma_count_size = sigma_cap_size;
+    // Validation control: retain the exponent width so the cap wraps at FP(2,16).
     // The cap is always representable in the shift operand, even when the
     // exponent workspace itself is wider and the count must be truncated.
     SASSERT(sigma_cap_size <= 2 * sig_size);
