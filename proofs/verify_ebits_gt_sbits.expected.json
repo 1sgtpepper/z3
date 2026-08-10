@@ -1,0 +1,72 @@
+{
+  "accepted_ebits_gt_sbits_formats": 1891,
+  "c_api_formats_with_sbits_at_least_3": 1830,
+  "c_api_round_width_crossings": 676,
+  "correction_width_categories": {
+    "equal": 60,
+    "extract": 61,
+    "zero_extend": 1770
+  },
+  "exhaustive_modular_states": 1499136,
+  "exhaustive_normalized_quotient_sbits": {
+    "max": 12,
+    "min": 2
+  },
+  "exhaustive_round_boundaries": [
+    {
+      "ebits": 11,
+      "sbits": 2
+    },
+    {
+      "ebits": 13,
+      "sbits": 3
+    },
+    {
+      "ebits": 15,
+      "sbits": 4
+    }
+  ],
+  "finite_quotient_res_sig_lz": [
+    1,
+    2
+  ],
+  "first_round_crossings": {
+    "2": 11,
+    "3": 13,
+    "4": 15,
+    "5": 17,
+    "6": 19,
+    "7": 21,
+    "8": 23,
+    "9": 25
+  },
+  "maximum_c_api_relative_width_format": {
+    "ebits": 63,
+    "sbits": 3,
+    "shift_data_width": 14,
+    "source_count_width": 65,
+    "widening_ratio": "65/14"
+  },
+  "maximum_format": {
+    "ebits": 63,
+    "sbits": 2,
+    "shift_data_width": 12,
+    "source_count_width": 65,
+    "widening_ratio": "65/12"
+  },
+  "minimum_deep_underflow_shift": {
+    "ebits": 2,
+    "minimum_width_margin": 16,
+    "shift": 8
+  },
+  "round_width_crossings": 729,
+  "verdict": "PASS",
+  "wide_cap_regression": {
+    "cap": 18,
+    "ebits": 2,
+    "sbits": 16,
+    "selected_shift": 6,
+    "sigma": -6,
+    "wrapped_cap": 2
+  }
+}
