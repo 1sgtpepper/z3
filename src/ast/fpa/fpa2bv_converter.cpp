@@ -4269,7 +4269,7 @@ void fpa2bv_converter::round(sort * s, expr_ref & rm, expr_ref & sgn, expr_ref &
     expr_ref sigma_neg(m), sigma_neg_capped(m), sigma_lt_zero(m), sig_ext(m),
         rs_sig(m), ls_sig(m), big_sh_sig(m);
     sigma_neg = m_bv_util.mk_bv_neg(sigma);
-    if (log2(sbits + 2) < sigma_size) {
+    if (log2(sbits + 2) <= sigma_size) {
         expr_ref sigma_cap(m), sigma_le_cap(m);
         sigma_cap = m_bv_util.mk_numeral(sbits + 2, sigma_size);
         sigma_le_cap = m_bv_util.mk_ule(sigma_neg, sigma_cap);
