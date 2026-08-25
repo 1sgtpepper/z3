@@ -1156,8 +1156,8 @@ void fpa2bv_converter::mk_div(sort * s, expr_ref & rm, expr_ref & x, expr_ref & 
         underflow_retained = m_bv_util.mk_extract(sbits + 1, 2, underflow_sig);
         underflow_inc = mk_rounding_decision(
             rm, res_sgn, underflow_last, underflow_round, underflow_sticky);
-        // This path shifts by at least eight bits, leaving a zero top bit, so
-        // adding the rounding increment cannot produce a normal result.
+        // This path shifts by at least eight bits, so the retained significand
+        // has a leading zero and rounding cannot carry into minimum normal.
         underflow_rounded_sig = m_bv_util.mk_bv_add(
             underflow_retained,
             m_bv_util.mk_zero_extend(sbits - 1, underflow_inc));
@@ -4272,8 +4272,8 @@ void fpa2bv_converter::round(sort * s, expr_ref & rm, expr_ref & sgn, expr_ref &
         dbg_decouple("fpa2bv_rnd_sigma_cap", sigma_cap);
     }
     else {
-        // If sbits+2 does not fit in sigma_size bits, it is larger than every
-        // possible sigma_neg, so no cap is needed.
+        // An unrepresentable cap is at least 2^sigma_size, while negating a
+        // negative sigma yields at most 2^(sigma_size-1), so the cap cannot bind.
         sigma_neg_capped = sigma_neg;
     }
     dbg_decouple("fpa2bv_rnd_sigma_neg", sigma_neg);
@@ -4289,8 +4289,8 @@ void fpa2bv_converter::round(sort * s, expr_ref & rm, expr_ref & sgn, expr_ref &
         ls_shift = m_bv_util.mk_zero_extend(shift_width - sigma_size, sigma);
     }
     else {
-        // Both shift amounts fit in shift_width bits: the right shift is capped
-        // at sbits+2, and a left shift cannot exceed sig's leading-zero count.
+        // The right count is capped at sbits+2, and a nonnegative sigma is at
+        // most sig's leading-zero count. Both are below shift_width.
         rs_shift = m_bv_util.mk_extract(shift_width - 1, 0, sigma_neg_capped);
         ls_shift = m_bv_util.mk_extract(shift_width - 1, 0, sigma);
     }
