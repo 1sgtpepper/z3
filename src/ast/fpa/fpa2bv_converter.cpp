@@ -1055,7 +1055,7 @@ void fpa2bv_converter::mk_div(sort * s, expr_ref & rm, expr_ref & x, expr_ref & 
     expr_ref sticky(m), too_large(m);
     sticky = m.mk_app(m_bv_util.get_fid(), OP_BREDOR, m_bv_util.mk_extract(extra_bits-2, 0, quotient));
     res_sig = m_bv_util.mk_concat(m_bv_util.mk_extract(extra_bits+sbits+1, extra_bits-1, quotient), sticky);
-    if (sbits == 2) {
+    if (sbits < 2) {
         // The excess quotient bits would be extract [3*sbits+1:2*sbits+4],
         // with width sbits-2. At sbits == 2, [7:8] is invalid, so skip both
         // the extract and OP_BREDOR; the OR of no excess bits is false.
