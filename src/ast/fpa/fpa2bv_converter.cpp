@@ -1091,7 +1091,7 @@ void fpa2bv_converter::mk_div(sort * s, expr_ref & rm, expr_ref & x, expr_ref & 
     if (exp_bits <= sbits + 4)
         exp_shift_amount = m_bv_util.mk_extract(exp_bits - 1, 0, res_sig_shift_amount);
     else
-        exp_shift_amount = m_bv_util.mk_zero_extend(exp_bits - (sbits + 4), res_sig_shift_amount);
+        exp_shift_amount = m_bv_util.mk_extract(exp_bits - 1, 0, res_sig_shift_amount);
     res_exp_shifted = m_bv_util.mk_bv_sub(res_exp, exp_shift_amount);
     m_simp.mk_ite(shift_cond, res_sig, res_sig_shifted, res_sig);
     m_simp.mk_ite(shift_cond, res_exp, res_exp_shifted, res_exp);
