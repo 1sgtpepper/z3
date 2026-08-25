@@ -67,7 +67,7 @@ jobs:
         if: matrix.runRegressions
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         if: matrix.runRegressions
@@ -206,7 +206,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -287,7 +287,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -407,7 +407,7 @@ jobs:
         if: matrix.runTests
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         if: matrix.runTests
@@ -447,7 +447,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -572,7 +572,7 @@ jobs:
       - name: Clone z3test
         run: |
           git clone https://github.com/1sgtpepper/z3test z3test
-          git -C z3test checkout 2b6a1bbbadfba808926274592e8512250460eb72
+          git -C z3test checkout aae584f2b5c23b295f5f07485f363abd2a37745c
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
