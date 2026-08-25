@@ -65,7 +65,9 @@ jobs:
 
       - name: Clone z3test
         if: matrix.runRegressions
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         if: matrix.runRegressions
@@ -202,7 +204,9 @@ jobs:
           cd ..
 
       - name: Clone z3test
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -281,7 +285,9 @@ jobs:
           cd ..
 
       - name: Clone z3test
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -399,7 +405,9 @@ jobs:
 
       - name: Clone z3test
         if: matrix.runTests
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         if: matrix.runTests
@@ -437,7 +445,9 @@ jobs:
           cd ..
 
       - name: Clone z3test
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
@@ -560,7 +570,9 @@ jobs:
           cd ..
 
       - name: Clone z3test
-        run: git clone https://github.com/z3prover/z3test z3test
+        run: |
+          git clone https://github.com/1sgtpepper/z3test z3test
+          git -C z3test checkout 7050c45620a060350119be9239c03a518254491f
 
       - name: Run regressions
         run: python z3test/scripts/test_benchmarks.py build/z3 z3test/regressions/smt2
