@@ -1,0 +1,178 @@
+name: Investigate issue 7842 combination scope
+
+on:
+  push:
+    branches: [investigate-7842-root-cause]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scope-matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout workflow branch
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact current upstream source
+        run: |
+          git remote add upstream https://github.com/Z3Prover/z3.git || true
+          git fetch --depth=1 upstream d7777e2ddd5be9c55b376db4ebebbb33b39bf45f
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = d7777e2ddd5be9c55b376db4ebebbb33b39bf45f
+
+      - name: Configure and build using upstream debug path
+        run: |
+          python scripts/mk_make.py -d
+          make -C build -j"$(nproc)"
+
+      - name: Create theory-combination scope matrix
+        run: |
+          mkdir -p issue7842-scope
+
+          cat > issue7842-scope/12-two-hidden-datatype-values.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (v (_ FloatingPoint 8 24)))))
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun x () Expr)
+          (declare-fun y () Expr)
+          (assert (= x (Flt a)))
+          (assert (= y (Flt b)))
+          (assert (distinct x y))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/13-syntactic-constructors-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (v (_ FloatingPoint 8 24)))))
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (assert (distinct (Flt a) (Flt b)))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (check-sat)
+          EOF
+
+          cat > issue7842-scope/14-uf-congruence.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/15-predicate-congruence.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun p ((_ FloatingPoint 8 24)) Bool)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (p a))
+          (assert (not (p b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/16-array-select-congruence.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun A () (Array (_ FloatingPoint 8 24) Int))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct (select A a) (select A b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/17-direct-two-nan-disequality-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct a b))
+          (check-sat)
+          EOF
+
+          cat > issue7842-scope/18-core-equality-bridge-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (= a b))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          EOF
+
+          cat > issue7842-scope/19-one-nan-literal-under-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.isNaN a))
+          (assert (distinct (g a) (g (_ NaN 8 24))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/20-two-nan-fp-result-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun z1 () (_ FloatingPoint 8 24))
+          (declare-fun z2 () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (define-fun pz () (_ FloatingPoint 8 24) (_ +zero 8 24))
+          (assert (= z1 (fp.div RNE pz pz)))
+          (assert (= z2 (_ NaN 8 24)))
+          (assert (distinct (g z1) (g z2)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-scope/21-plus-minus-zero-core-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (distinct (g (_ +zero 8 24)) (g (_ -zero 8 24))))
+          (check-sat)
+          (get-model)
+          EOF
+
+      - name: Run matrix with model validation
+        shell: bash
+        run: |
+          set +e
+          {
+            echo "upstream=$(git rev-parse HEAD)"
+            echo "z3=$(build/z3 -version)"
+            echo
+            for f in issue7842-scope/*.smt2; do
+              echo "===== $(basename "$f") ====="
+              build/z3 model_validate=true "$f" 2>&1
+              echo "exit=$?"
+              echo
+            done
+          } | tee issue7842-scope-results.txt
+          exit 0
+
+      - name: Upload exact outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7842-combination-scope
+          path: |
+            issue7842-scope-results.txt
+            issue7842-scope/*.smt2
+          if-no-files-found: error
