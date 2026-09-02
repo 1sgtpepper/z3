@@ -1,0 +1,66 @@
+name: Investigate issue 7842 across both SMT backends
+
+on:
+  push:
+    branches: [investigate-7842-dual-engine]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dual-engine-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Preserve harnesses and check out exact current upstream source
+        run: |
+          cp .github/diagnostics/issue_7842_nan_anchor.py /tmp/issue_7842_nan_anchor.py
+          cp .github/diagnostics/issue_7842_dual_engine.py /tmp/issue_7842_dual_engine.py
+          git remote add upstream https://github.com/Z3Prover/z3.git || true
+          git fetch --depth=1 upstream e6a66c1281d33ea99b6dd55e199e2757f4b67f5e
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = e6a66c1281d33ea99b6dd55e199e2757f4b67f5e
+
+      - name: Configure and build exact baseline
+        run: |
+          python scripts/mk_make.py -d
+          make -C build -j"$(nproc)"
+          make -C build -j"$(nproc)" test-z3
+
+      - name: Prepare semantic oracle including historical regression
+        run: python /tmp/issue_7842_nan_anchor.py prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Run exact-baseline oracle on legacy and sat.smt backends
+        run: python /tmp/issue_7842_dual_engine.py baseline
+
+      - name: Apply abstract NaN equality anchor to both backends
+        run: |
+          python /tmp/issue_7842_nan_anchor.py patch
+          python /tmp/issue_7842_dual_engine.py patch
+          git diff --check
+          git diff -- src/smt/theory_fpa.cpp src/sat/smt/fpa_solver.cpp \
+            | tee issue7842-nan-anchor/dual-engine-semantic-nan-anchor.patch
+
+      - name: Rebuild patched solver
+        run: make -C build -j"$(nproc)"
+
+      - name: Enforce semantic oracle on both patched backends
+        run: python /tmp/issue_7842_dual_engine.py patched
+
+      - name: Run upstream unit suite with dual-backend patch
+        run: build/test-z3 -a
+
+      - name: Upload exact diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7842-dual-engine-evidence
+          path: issue7842-nan-anchor/
+          if-no-files-found: error
