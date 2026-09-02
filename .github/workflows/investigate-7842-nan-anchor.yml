@@ -1,0 +1,367 @@
+name: Investigate issue 7842 semantic NaN anchor
+
+on:
+  push:
+    branches: [investigate-7842-nan-anchor]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nan-anchor-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check out exact current upstream source
+        run: |
+          git remote add upstream https://github.com/Z3Prover/z3.git || true
+          git fetch --depth=1 upstream e80eeb1150bf9d248778c6ea1937542ca109da27
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = e80eeb1150bf9d248778c6ea1937542ca109da27
+
+      - name: Configure and build debug Z3 plus unit tests
+        run: |
+          python scripts/mk_make.py -d
+          make -C build -j"$(nproc)"
+          make -C build -j"$(nproc)" test-z3
+
+      - name: Create semantic-equality matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p issue7842-nan-anchor
+
+          cat > issue7842-nan-anchor/01-issue-7842.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (getFlt_1 (_ FloatingPoint 8 24)))))
+          (declare-fun x () Expr)
+          (assert (distinct x (Flt (_ NaN 8 24))))
+          (assert (fp.isNaN (getFlt_1 x)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/02-uf-nan.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/03-predicate-nan.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun p ((_ FloatingPoint 8 24)) Bool)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (p a))
+          (assert (not (p b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/04-array-nan.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun A () (Array (_ FloatingPoint 8 24) Int))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct (select A a) (select A b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/05-nested-datatype.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Inner ((I (iv (_ FloatingPoint 8 24)))))
+          (declare-datatype Outer ((O (ov Inner))))
+          (declare-fun x () Outer)
+          (assert (distinct x (O (I (_ NaN 8 24)))))
+          (assert (fp.isNaN (iv (ov x))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/06-two-nan-payloads-through-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (define-fun n1 () (_ FloatingPoint 8 24)
+            (fp #b0 #xff #b00000000000000000000001))
+          (define-fun n2 () (_ FloatingPoint 8 24)
+            (fp #b1 #xff #b10000000000000000000000))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (distinct (g n1) (g n2)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/07-two-nan-payloads-direct.smt2 <<'EOF'
+          (set-logic ALL)
+          (define-fun n1 () (_ FloatingPoint 8 24)
+            (fp #b0 #xff #b00000000000000000000001))
+          (define-fun n2 () (_ FloatingPoint 8 24)
+            (fp #b1 #xff #b10000000000000000000000))
+          (assert (distinct n1 n2))
+          (check-sat)
+          EOF
+
+          cat > issue7842-nan-anchor/08-issue-6728.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-const c RoundingMode)
+          (declare-const x Float64)
+          (declare-sort T 0)
+          (declare-fun f (Float64) T)
+          (assert (not (= (f (fp.add c x (_ NaN 11 53)))
+                          (f (fp.add c (_ NaN 11 53) x)))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/09-finite-equality-through-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (define-fun one () (_ FloatingPoint 8 24)
+            (fp #b0 #x7f #b00000000000000000000000))
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.eq a one))
+          (assert (fp.eq b one))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/10-infinity-equality-through-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.eq a (_ +oo 8 24)))
+          (assert (fp.eq b (_ +oo 8 24)))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/11-signed-zero-fpeq-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          ; fp.eq identifies +0 and -0, while SMT equality deliberately does not.
+          (assert (fp.eq a (_ +zero 8 24)))
+          (assert (fp.eq b (_ +zero 8 24)))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/12-signed-zero-builtin-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (distinct (g (_ +zero 8 24)) (g (_ -zero 8 24))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/13-unconstrained-uf-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue7842-nan-anchor/14-direct-nan-disequality-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct a b))
+          (check-sat)
+          EOF
+
+          cat > issue7842-nan-anchor/15-explicit-equality-bridge-control.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (= a b))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          EOF
+
+          cat > issue7842-nan-anchor/16-incremental-nan-uf.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun a () (_ FloatingPoint 8 24))
+          (declare-fun b () (_ FloatingPoint 8 24))
+          (declare-fun g ((_ FloatingPoint 8 24)) Int)
+          (push)
+          (assert (fp.isNaN a))
+          (assert (fp.isNaN b))
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          (pop)
+          (assert (distinct (g a) (g b)))
+          (check-sat)
+          EOF
+
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          request = urllib.request.Request(
+              'https://api.github.com/repos/Z3Prover/z3/issues/6972',
+              headers={
+                  'Accept': 'application/vnd.github+json',
+                  'Authorization': f"Bearer {os.environ['GH_TOKEN']}",
+                  'X-GitHub-Api-Version': '2022-11-28',
+              },
+          )
+          with urllib.request.urlopen(request) as response:
+              body = json.load(response)['body']
+          blocks = re.findall(r'```(?:smt|smt2)?\s*\n(.*?)```', body, flags=re.S | re.I)
+          if not blocks:
+              raise SystemExit('could not recover issue #6972 SMT block')
+          Path('issue7842-nan-anchor/17-issue-6972-regression.smt2').write_text(
+              blocks[0].replace('\r\n', '\n').replace('\r', '\n')
+          )
+          PY
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Define expected results
+        run: |
+          cat > issue7842-nan-anchor/expected.tsv <<'EOF'
+          01-issue-7842.smt2	unsat
+          02-uf-nan.smt2	unsat
+          03-predicate-nan.smt2	unsat
+          04-array-nan.smt2	unsat
+          05-nested-datatype.smt2	unsat
+          06-two-nan-payloads-through-uf.smt2	unsat
+          07-two-nan-payloads-direct.smt2	unsat
+          08-issue-6728.smt2	unsat
+          09-finite-equality-through-uf.smt2	unsat
+          10-infinity-equality-through-uf.smt2	unsat
+          11-signed-zero-fpeq-control.smt2	sat
+          12-signed-zero-builtin-control.smt2	sat
+          13-unconstrained-uf-control.smt2	sat
+          14-direct-nan-disequality-control.smt2	unsat
+          15-explicit-equality-bridge-control.smt2	unsat
+          16-incremental-nan-uf.smt2	unsat,sat
+          17-issue-6972-regression.smt2	unsat
+          EOF
+
+      - name: Run baseline matrix
+        shell: bash
+        run: |
+          set +e
+          : > issue7842-nan-anchor/baseline-results.txt
+          while IFS=$'\t' read -r file expected; do
+            echo "===== ${file} (expected ${expected}) =====" | tee -a issue7842-nan-anchor/baseline-results.txt
+            output=$(timeout 180 build/z3 model_validate=true "issue7842-nan-anchor/${file}" 2>&1)
+            status=$?
+            printf '%s\n' "$output" | tee -a issue7842-nan-anchor/baseline-results.txt
+            actual=$(printf '%s\n' "$output" | sed -n -E 's/^(sat|unsat|unknown)$/\1/p' | paste -sd, -)
+            invalid=no
+            printf '%s\n' "$output" | grep -q 'invalid model was generated' && invalid=yes
+            echo "actual=${actual:-<none>} exit=${status} invalid_model=${invalid}" | tee -a issue7842-nan-anchor/baseline-results.txt
+            echo | tee -a issue7842-nan-anchor/baseline-results.txt
+          done < issue7842-nan-anchor/expected.tsv
+          exit 0
+
+      - name: Apply abstract semantic NaN-equality anchor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/smt/theory_fpa.cpp')
+          source = path.read_text()
+          old = '''        if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+            if (!m_fpa_util.is_fp(n)) {
+'''
+          new = '''        if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+            // SMT-LIB has one abstract NaN value, while the BV encoding has
+            // many NaN payloads. Expose this quotient equality to the core so
+            // EUF congruence cannot distinguish semantically equal NaN terms.
+            // This constrains only abstract equality, not the wrapped payload.
+            if (m_fpa_util.is_float(n)) {
+                unsigned ebits = m_fpa_util.get_ebits(n->get_sort());
+                unsigned sbits = m_fpa_util.get_sbits(n->get_sort());
+                expr_ref is_nan(m), nan_eq(m);
+                is_nan = m_fpa_util.mk_is_nan(n);
+                nan_eq = m.mk_eq(n, m_fpa_util.mk_nan(ebits, sbits));
+                assert_cnstr(m.mk_implies(is_nan, nan_eq));
+            }
+
+            if (!m_fpa_util.is_fp(n)) {
+'''
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one insertion site, found {source.count(old)}')
+          path.write_text(source.replace(old, new, 1))
+          PY
+          git diff --check
+          git diff -- src/smt/theory_fpa.cpp | tee issue7842-nan-anchor/semantic-nan-anchor.patch
+
+      - name: Rebuild patched Z3
+        run: make -C build -j"$(nproc)"
+
+      - name: Run patched matrix and enforce oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > issue7842-nan-anchor/patched-results.txt
+          failures=0
+          while IFS=$'\t' read -r file expected; do
+            echo "===== ${file} (expected ${expected}) =====" | tee -a issue7842-nan-anchor/patched-results.txt
+            set +e
+            output=$(timeout 180 build/z3 model_validate=true "issue7842-nan-anchor/${file}" 2>&1)
+            status=$?
+            set -e
+            printf '%s\n' "$output" | tee -a issue7842-nan-anchor/patched-results.txt
+            actual=$(printf '%s\n' "$output" | sed -n -E 's/^(sat|unsat|unknown)$/\1/p' | paste -sd, -)
+            invalid=no
+            printf '%s\n' "$output" | grep -q 'invalid model was generated' && invalid=yes
+            echo "actual=${actual:-<none>} exit=${status} invalid_model=${invalid}" | tee -a issue7842-nan-anchor/patched-results.txt
+            if [[ "$actual" != "$expected" || "$invalid" != no || "$status" -ne 0 ]]; then
+              echo "ORACLE FAILURE: ${file}" | tee -a issue7842-nan-anchor/patched-results.txt
+              failures=$((failures + 1))
+            fi
+            echo | tee -a issue7842-nan-anchor/patched-results.txt
+          done < issue7842-nan-anchor/expected.tsv
+          test "$failures" -eq 0
+
+      - name: Run upstream unit suite with patch
+        run: build/test-z3 -a
+
+      - name: Upload diagnostic evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7842-semantic-nan-anchor
+          path: |
+            issue7842-nan-anchor/baseline-results.txt
+            issue7842-nan-anchor/patched-results.txt
+            issue7842-nan-anchor/semantic-nan-anchor.patch
+            issue7842-nan-anchor/expected.tsv
+            issue7842-nan-anchor/*.smt2
+          if-no-files-found: error
