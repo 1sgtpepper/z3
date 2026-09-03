@@ -1,0 +1,164 @@
+name: Isolate issue 7842 interface equality
+
+on:
+  push:
+    branches: [investigate-issue-7842-interface-equality]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+
+      - name: Record revisions
+        run: |
+          printf 'workflow head: %s\n' "$(git rev-parse HEAD)"
+          printf 'upstream source parent: %s\n' "$(git rev-parse HEAD^)"
+
+      - name: Build debug Z3
+        run: |
+          python scripts/mk_make.py -d
+          make -C build -j2
+
+      - name: Run semantic boundary matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir issue-7842
+
+          cat > issue-7842/direct-fp.smt2 <<'EOF'
+          (set-logic QF_FP)
+          (declare-fun x () (_ FloatingPoint 8 24))
+          (assert (fp.isNaN x))
+          (assert (distinct x (_ NaN 8 24)))
+          (check-sat)
+          EOF
+
+          cat > issue-7842/selector-fp.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+          (declare-fun x () Expr)
+          (assert (fp.isNaN (value x)))
+          (assert (distinct (value x) (_ NaN 8 24)))
+          (check-sat)
+          EOF
+
+          cat > issue-7842/datatype-fp.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+          (declare-fun x () Expr)
+          (assert (fp.isNaN (value x)))
+          (assert (distinct x (Flt (_ NaN 8 24))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue-7842/datatype-explicit-field-equality.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+          (declare-fun x () Expr)
+          (assert (= (value x) (_ NaN 8 24)))
+          (assert (distinct x (Flt (_ NaN 8 24))))
+          (check-sat)
+          EOF
+
+          cat > issue-7842/datatype-two-nans.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+          (declare-fun x () (_ FloatingPoint 8 24))
+          (declare-fun y () (_ FloatingPoint 8 24))
+          (assert (fp.isNaN x))
+          (assert (fp.isNaN y))
+          (assert (distinct (Flt x) (Flt y)))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue-7842/uf-nan.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun p ((_ FloatingPoint 8 24)) Bool)
+          (declare-fun x () (_ FloatingPoint 8 24))
+          (assert (fp.isNaN x))
+          (assert (p x))
+          (assert (not (p (_ NaN 8 24))))
+          (check-sat)
+          (get-model)
+          EOF
+
+          cat > issue-7842/uf-explicit-equality.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun p ((_ FloatingPoint 8 24)) Bool)
+          (declare-fun x () (_ FloatingPoint 8 24))
+          (assert (= x (_ NaN 8 24)))
+          (assert (p x))
+          (assert (not (p (_ NaN 8 24))))
+          (check-sat)
+          EOF
+
+          cat > issue-7842/uf-positive-infinity.smt2 <<'EOF'
+          (set-logic ALL)
+          (declare-fun p ((_ FloatingPoint 8 24)) Bool)
+          (declare-fun x () (_ FloatingPoint 8 24))
+          (assert (fp.isInfinite x))
+          (assert (fp.isPositive x))
+          (assert (p x))
+          (assert (not (p (_ +oo 8 24))))
+          (check-sat)
+          EOF
+
+          run_unsat() {
+            local name="$1"
+            local output
+            local result
+            output="$(build/z3 model_validate=true "issue-7842/$name.smt2" 2>&1 || true)"
+            printf '\n[%s]\n%s\n' "$name" "$output"
+            result="$(printf '%s\n' "$output" | grep -m1 -E '^(sat|unsat|unknown)$' || true)"
+            test "$result" = unsat
+            ! printf '%s\n' "$output" | grep -Fq 'invalid model was generated'
+          }
+
+          run_invalid_sat() {
+            local name="$1"
+            local output
+            local result
+            output="$(build/z3 model_validate=true "issue-7842/$name.smt2" 2>&1 || true)"
+            printf '\n[%s]\n%s\n' "$name" "$output"
+            result="$(printf '%s\n' "$output" | grep -m1 -E '^(sat|unsat|unknown)$' || true)"
+            test "$result" = sat
+            printf '%s\n' "$output" | grep -Fq 'invalid model was generated'
+          }
+
+          run_unsat direct-fp
+          run_unsat selector-fp
+          run_invalid_sat datatype-fp
+          run_unsat datatype-explicit-field-equality
+          run_invalid_sat datatype-two-nans
+          run_invalid_sat uf-nan
+          run_unsat uf-explicit-equality
+          run_unsat uf-positive-infinity
+
+      - name: Trace the datatype witness
+        shell: bash
+        run: |
+          build/z3 \
+            -tr:t_fpa \
+            -tr:t_fpa_detail \
+            -tr:t_fpa_internalize \
+            -tr:datatype \
+            -tr:add_eq \
+            -tr:add_diseq \
+            -tr:final_check_step \
+            -tr:get_model \
+            model_validate=true \
+            issue-7842/datatype-fp.smt2 > issue-7842/datatype-trace.log 2>&1 || true
+          grep -E \
+            'new theory var|new eq:|new diseq:|final_check|mk_value|result:|add_diseq|add_eq' \
+            issue-7842/datatype-trace.log | head -n 250 || true
