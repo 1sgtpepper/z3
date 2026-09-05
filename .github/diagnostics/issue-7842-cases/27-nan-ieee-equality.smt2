@@ -1,0 +1,5 @@
+(set-logic ALL)
+(declare-const a (_ FloatingPoint 8 24))
+(assert (fp.isNaN a))
+(assert (not (fp.eq a a)))
+(check-sat)

@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+(declare-const x Expr)
+(assert (fp.eq (value x) (fp #b0 #x00 #b00000000000000000000001)))
+(assert (distinct x (Flt (fp #b0 #x00 #b00000000000000000000001))))
+(check-sat)

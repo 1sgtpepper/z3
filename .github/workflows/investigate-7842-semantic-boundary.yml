@@ -1,0 +1,78 @@
+name: Investigate issue 7842 semantic boundary
+
+on:
+  push:
+    branches: [investigate-7842-semantic-boundary]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 2
+      - name: Record and verify source identity
+        run: |
+          test "$(git rev-parse HEAD^)" = 6b3eb242b822fcb58adf4293f0564b1391db7a6e
+          test -z "$(git diff HEAD^ HEAD -- src scripts CMakeLists.txt cmake)"
+          mkdir issue-7842-evidence
+          git rev-parse HEAD HEAD^ > issue-7842-evidence/revisions.txt
+          cp -r .github/diagnostics/issue-7842-cases issue-7842-evidence/cases
+      - name: Restore exact debug build
+        id: debug-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: issue-7842-debug-ubuntu24-make-v1-6b3eb242b822fcb58adf4293f0564b1391db7a6e
+      - name: Build baseline with tracing
+        run: |
+          python3 scripts/mk_make.py -d
+          make -C build -j4
+          build/z3 -version > issue-7842-evidence/version.txt
+          sha256sum build/z3 > issue-7842-evidence/baseline-binary.sha256
+      - name: Save unchanged baseline build
+        if: steps.debug-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: issue-7842-debug-ubuntu24-make-v1-6b3eb242b822fcb58adf4293f0564b1391db7a6e
+      - name: Record baseline oracles and full traces
+        run: python3 .github/diagnostics/issue_7842_boundary.py baseline
+      - name: Apply semantic equality intervention
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/smt/theory_fpa.cpp')
+          source = p.read_text()
+          old = '        if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {\n            if (!m_fpa_util.is_fp(n)) {'
+          new = '''        if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+                      if (m_fpa_util.is_float(n)) {
+                          unsigned ebits = m_fpa_util.get_ebits(n->get_sort());
+                          unsigned sbits = m_fpa_util.get_sbits(n->get_sort());
+                          expr_ref is_nan(m), nan_eq(m);
+                          is_nan = m_fpa_util.mk_is_nan(n);
+                          nan_eq = m.mk_eq(n, m_fpa_util.mk_nan(ebits, sbits));
+                          assert_cnstr(m.mk_implies(is_nan, nan_eq));
+                      }
+                      if (!m_fpa_util.is_fp(n)) {'''
+          assert source.count(old) == 1
+          p.write_text(source.replace(old, new))
+          PY
+          git diff --check
+          git diff -- src/smt/theory_fpa.cpp > issue-7842-evidence/intervention.patch
+          make -C build -j4
+          sha256sum build/z3 > issue-7842-evidence/intervention-binary.sha256
+      - name: Test intervention against every semantic oracle
+        run: python3 .github/diagnostics/issue_7842_boundary.py intervention
+      - name: Preserve all diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7842-semantic-boundary
+          path: issue-7842-evidence/
+          if-no-files-found: error

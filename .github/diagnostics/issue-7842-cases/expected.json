@@ -1,0 +1,116 @@
+{
+  "01-issue-7842.smt2": [
+    "unsat"
+  ],
+  "02-uf-nan.smt2": [
+    "unsat"
+  ],
+  "03-predicate-nan.smt2": [
+    "unsat"
+  ],
+  "04-array-nan.smt2": [
+    "unsat"
+  ],
+  "05-nested-datatype.smt2": [
+    "unsat"
+  ],
+  "06-two-nan-payloads-through-uf.smt2": [
+    "unsat"
+  ],
+  "07-two-nan-payloads-direct.smt2": [
+    "unsat"
+  ],
+  "08-issue-6728.smt2": [
+    "unsat"
+  ],
+  "09-finite-equality-through-uf.smt2": [
+    "unsat"
+  ],
+  "10-infinity-equality-through-uf.smt2": [
+    "unsat"
+  ],
+  "11-signed-zero-fpeq-control.smt2": [
+    "sat"
+  ],
+  "12-signed-zero-builtin-control.smt2": [
+    "sat"
+  ],
+  "13-unconstrained-uf-control.smt2": [
+    "sat"
+  ],
+  "14-direct-nan-disequality-control.smt2": [
+    "unsat"
+  ],
+  "15-explicit-equality-bridge-control.smt2": [
+    "unsat"
+  ],
+  "16-incremental-nan-uf.smt2": [
+    "unsat",
+    "sat"
+  ],
+  "17-issue-6972-regression.smt2": [
+    "unsat"
+  ],
+  "extra-04-finite-fp-semantic-equality.smt2": [
+    "unsat"
+  ],
+  "extra-06-two-field-fp.smt2": [
+    "unsat"
+  ],
+  "extra-08-int-derived-equality.smt2": [
+    "unsat"
+  ],
+  "extra-09-bv-bitwise-derived-equality.smt2": [
+    "unsat"
+  ],
+  "extra-11-multiconstructor-fp.smt2": [
+    "unsat"
+  ],
+  "18-explicit-constructors.smt2": [
+    "unsat"
+  ],
+  "19-selector-core-equality.smt2": [
+    "unsat"
+  ],
+  "20-selector-disequality.smt2": [
+    "unsat"
+  ],
+  "21-datatype-unconstrained.smt2": [
+    "sat"
+  ],
+  "22-second-field-can-differ.smt2": [
+    "sat"
+  ],
+  "23-wrong-constructor-selector.smt2": [
+    "sat"
+  ],
+  "24-min-format.smt2": [
+    "unsat"
+  ],
+  "25-double-format.smt2": [
+    "unsat"
+  ],
+  "26-symbolic-payloads-uf.smt2": [
+    "unsat"
+  ],
+  "27-nan-ieee-equality.smt2": [
+    "sat"
+  ],
+  "28-positive-infinity.smt2": [
+    "unsat"
+  ],
+  "29-subnormal.smt2": [
+    "unsat"
+  ],
+  "30-nan-round-trip-payloads.smt2": [
+    "sat"
+  ],
+  "31-field-reuse-push-pop.smt2": [
+    "unsat",
+    "sat",
+    "unsat"
+  ],
+  "32-rounding-mode.smt2": [
+    "unsat"
+  ]
+}

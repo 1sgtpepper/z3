@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-datatype Pair ((P (value (_ FloatingPoint 8 24)) (tag Int))))
+(declare-const x Pair)
+(assert (fp.isNaN (value x)))
+(assert (distinct x (P (_ NaN 8 24) 0)))
+(check-sat)

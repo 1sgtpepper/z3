@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-datatype Inner ((I (iv (_ FloatingPoint 8 24)))))
+(declare-datatype Outer ((O (ov Inner))))
+(declare-fun x () Outer)
+(assert (distinct x (O (I (_ NaN 8 24)))))
+(assert (fp.isNaN (iv (ov x))))
+(check-sat)

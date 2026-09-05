@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-fun a () (_ FloatingPoint 8 24))
+(declare-fun b () (_ FloatingPoint 8 24))
+(declare-fun A () (Array (_ FloatingPoint 8 24) Int))
+(assert (fp.isNaN a))
+(assert (fp.isNaN b))
+(assert (distinct (select A a) (select A b)))
+(check-sat)

@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-datatype Box ((BoxInt (ival Int))))
+(declare-fun x () Box)
+(assert (distinct x (BoxInt 0)))
+(assert (<= (ival x) 0))
+(assert (>= (ival x) 0))
+(check-sat)

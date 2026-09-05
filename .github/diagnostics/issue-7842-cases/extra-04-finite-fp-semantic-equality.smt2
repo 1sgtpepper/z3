@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-datatype Expr ((Flt (getFlt_1 (_ FloatingPoint 8 24)))))
+(declare-fun x () Expr)
+(define-fun one () (_ FloatingPoint 8 24)
+  (fp #b0 #b01111111 #b00000000000000000000000))
+(assert (distinct x (Flt one)))
+(assert (fp.eq (getFlt_1 x) one))
+(check-sat)
