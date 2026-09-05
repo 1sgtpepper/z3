@@ -15,13 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 3
       - name: Record and verify source identity
         run: |
-          test "$(git rev-parse HEAD^)" = 6b3eb242b822fcb58adf4293f0564b1391db7a6e
-          test -z "$(git diff HEAD^ HEAD -- src scripts CMakeLists.txt cmake)"
+          git cat-file -e 6b3eb242b822fcb58adf4293f0564b1391db7a6e^{commit}
+          test -z "$(git diff 6b3eb242b822fcb58adf4293f0564b1391db7a6e HEAD -- src scripts CMakeLists.txt cmake)"
           mkdir issue-7842-evidence
-          git rev-parse HEAD HEAD^ > issue-7842-evidence/revisions.txt
+          git rev-parse HEAD 6b3eb242b822fcb58adf4293f0564b1391db7a6e > issue-7842-evidence/revisions.txt
           cp -r .github/diagnostics/issue-7842-cases issue-7842-evidence/cases
       - name: Restore exact debug build
         id: debug-cache

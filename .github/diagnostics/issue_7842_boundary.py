@@ -44,15 +44,16 @@ for name in traces:
     directory = output_dir / Path(name).stem
     directory.mkdir(exist_ok=True)
     command = [str(solver), "-tr:t_fpa", "-tr:t_fpa_detail", "-tr:t_fpa_internalize",
-               "-tr:datatype", "-tr:add_eq", "-tr:add_diseq", "-tr:final_check",
+               "-tr:datatype", "-tr:add_eq", "-tr:add_eq_detail", "-tr:add_diseq", "-tr:final_check",
                "-tr:final_check_step", "-tr:final_check_result", "-tr:after_search",
-               "-tr:theory_bv", "-tr:get_model", "model_validate=true",
+               "-tr:fixed_var_eh", "-tr:get_model", "model_validate=true",
                str((cases / name).resolve())]
     result = subprocess.run(command, cwd=directory, capture_output=True, text=True, timeout=30)
     (directory / "stdout.txt").write_text(result.stdout)
     (directory / "stderr.txt").write_text(result.stderr)
     (directory / "command.json").write_text(json.dumps(command, indent=2) + "\n")
-    assert (directory / "z3.log").stat().st_size > 0, "native trace not captured"
+    (directory / ".z3-trace").rename(directory / "trace.log")
+    assert (directory / "trace.log").stat().st_size > 0, "native trace not captured"
 
 if stage == "intervention" and any(not row["passed"] for row in rows):
     raise SystemExit("Semantic intervention did not satisfy every oracle; inspect all recorded outcomes.")
