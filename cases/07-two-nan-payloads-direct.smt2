@@ -1,0 +1,7 @@
+(set-logic ALL)
+(define-fun n1 () (_ FloatingPoint 8 24)
+  (fp #b0 #xff #b00000000000000000000001))
+(define-fun n2 () (_ FloatingPoint 8 24)
+  (fp #b1 #xff #b10000000000000000000000))
+(assert (distinct n1 n2))
+(check-sat)

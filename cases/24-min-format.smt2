@@ -1,0 +1,6 @@
+(set-logic ALL)
+(declare-datatype Expr ((Flt (value (_ FloatingPoint 2 2)))))
+(declare-const x Expr)
+(assert (fp.isNaN (value x)))
+(assert (distinct x (Flt (_ NaN 2 2))))
+(check-sat)

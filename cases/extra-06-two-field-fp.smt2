@@ -1,0 +1,11 @@
+(set-logic ALL)
+(declare-datatype Pair ((Pair2
+  (fst (_ FloatingPoint 8 24))
+  (snd (_ FloatingPoint 8 24)))))
+(declare-fun x () Pair)
+(define-fun one () (_ FloatingPoint 8 24)
+  (fp #b0 #b01111111 #b00000000000000000000000))
+(assert (distinct x (Pair2 (_ NaN 8 24) one)))
+(assert (fp.isNaN (fst x)))
+(assert (fp.eq (snd x) one))
+(check-sat)

@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+(declare-const x Expr)
+(assert (fp.isInfinite (value x)))
+(assert (fp.isPositive (value x)))
+(assert (distinct x (Flt (_ +oo 8 24))))
+(check-sat)

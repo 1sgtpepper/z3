@@ -1,0 +1,92 @@
+name: Investigate issue 7842 raw NaN identity
+
+on:
+  push:
+    branches: [investigate-7842-raw-nan]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          path: diagnostic
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: Z3Prover/z3
+          ref: f85ec6c198b4ba8dd95c33005731f8a3a5c13f88
+          path: source
+      - name: Record source and inputs
+        run: |
+          mkdir evidence
+          git -C diagnostic rev-parse HEAD > evidence/harness-revision.txt
+          git -C source rev-parse HEAD > evidence/source-revision.txt
+          test "$(cat evidence/source-revision.txt)" = f85ec6c198b4ba8dd95c33005731f8a3a5c13f88
+          test -z "$(git -C source status --porcelain)"
+          cp -r diagnostic/cases diagnostic/patches evidence/
+      - name: Restore exact instrumented baseline build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: source/build
+          key: issue-7842-debug-ubuntu24-f85ec6c198b4ba8dd95c33005731f8a3a5c13f88-${{ hashFiles('diagnostic/patches/trace.patch') }}
+      - name: Build instrumented baseline
+        working-directory: source
+        run: |
+          set -o pipefail
+          git apply --check ../diagnostic/patches/trace.patch
+          git apply ../diagnostic/patches/trace.patch
+          python3 scripts/mk_make.py -d 2>&1 | tee ../evidence/configure.log
+          make -C build -j4 2>&1 | tee ../evidence/baseline-build.log
+          build/z3 -version > ../evidence/version.txt
+      - name: Save baseline build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: source/build
+          key: issue-7842-debug-ubuntu24-f85ec6c198b4ba8dd95c33005731f8a3a5c13f88-${{ hashFiles('diagnostic/patches/trace.patch') }}
+      - name: Record all variants
+        run: |
+          set -o pipefail
+          for variant in baseline raw broad; do
+            if [ "$variant" = broad ]; then
+              git -C source apply -R ../diagnostic/patches/raw.patch
+            fi
+            if [ "$variant" != baseline ]; then
+              git -C source apply --check "../diagnostic/patches/$variant.patch"
+              git -C source apply "../diagnostic/patches/$variant.patch"
+              make -C source/build -j4 2>&1 | tee "evidence/$variant-build.log"
+            fi
+            git -C source diff --check
+            git -C source diff > "evidence/$variant-source.patch"
+            python3 diagnostic/record.py "$variant" source evidence
+          done
+      - name: Evaluate semantic outcomes and trace coverage
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          failures = []
+          for stage in ('baseline', 'raw', 'broad'):
+              rows = json.loads((Path('evidence') / stage / 'results.json').read_text())
+              assert len(rows) == 200, (stage, len(rows))
+              print(stage, sum(r['passed'] for r in rows), '/', len(rows))
+              if stage != 'baseline':
+                  failures += [(stage, r['case'], r['configuration']) for r in rows if not r['passed']]
+              for case in ('01-issue-7842.smt2', '26-symbolic-payloads-uf.smt2'):
+                  for mode in ('default', 'relevancy-0', 'relevancy-2'):
+                      row = next(r for r in rows if r['case'] == case and r['configuration'] == mode)
+                      assert row['effective_relevancy'], (stage, case, mode, 'no effective-mode trace')
+          assert not failures, failures
+          PY
+      - name: Preserve diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-7842-raw-nan-identity
+          path: evidence/
+          if-no-files-found: error

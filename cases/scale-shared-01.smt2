@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-const x0 (_ FloatingPoint 3 3))
+(declare-fun h ((_ FloatingPoint 3 3) (_ FloatingPoint 3 3)) (_ FloatingPoint 3 3))
+(assert (fp.isNaN x0))
+(define-fun x1 () (_ FloatingPoint 3 3) (h x0 x0))
+(assert (fp.isNaN x1))
+(check-sat)

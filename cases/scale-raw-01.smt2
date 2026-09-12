@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-fun f ((_ FloatingPoint 3 3)) Int)
+(declare-const s0 (_ BitVec 1))
+(declare-const p0 (_ BitVec 2))
+(assert (distinct p0 #b00))
+(assert (= (f (fp s0 #b111 p0)) 0))
+(check-sat)

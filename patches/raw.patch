@@ -1,0 +1,17 @@
+--- a/src/smt/theory_fpa.cpp
++++ b/src/smt/theory_fpa.cpp
+@@ -443,7 +443,13 @@
+         mpf_manager & mpfm = m_fpa_util.fm();
+ 
+         if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+-            if (!m_fpa_util.is_fp(n)) {
++            if (m_fpa_util.is_fp(n)) {
++                expr_ref is_nan(m);
++                app_ref nan_test(m_fpa_util.mk_is_nan(n), m);
++                m_converter.mk_is_nan(nan_test->get_decl(), 1, nan_test->get_args(), is_nan);
++                assert_cnstr(m.mk_implies(is_nan, m.mk_eq(n, m_fpa_util.mk_nan(n->get_sort()))));
++            }
++            else {
+                 expr_ref wrapped(m), c(m);
+                 wrapped = m_converter.wrap(n);
+                 mpf_rounding_mode rm;

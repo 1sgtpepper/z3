@@ -1,0 +1,8 @@
+(set-logic ALL)
+(declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))
+(declare-const a (_ FloatingPoint 8 24))
+(declare-const b (_ FloatingPoint 8 24))
+(assert (fp.isNaN a))
+(assert (fp.isNaN b))
+(assert (distinct (Flt a) (Flt b)))
+(check-sat)

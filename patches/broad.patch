@@ -1,0 +1,19 @@
+diff --git a/src/smt/theory_fpa.cpp b/src/smt/theory_fpa.cpp
+index b9fb4bf..c921e46 100644
+--- a/src/smt/theory_fpa.cpp
++++ b/src/smt/theory_fpa.cpp
+@@ -443,6 +443,14 @@ namespace smt {
+         mpf_manager & mpfm = m_fpa_util.fm();
+ 
+         if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
++            if (m_fpa_util.is_float(n)) {
++                unsigned ebits = m_fpa_util.get_ebits(n->get_sort());
++                unsigned sbits = m_fpa_util.get_sbits(n->get_sort());
++                expr_ref is_nan(m), nan_eq(m);
++                is_nan = m_fpa_util.mk_is_nan(n);
++                nan_eq = m.mk_eq(n, m_fpa_util.mk_nan(ebits, sbits));
++                assert_cnstr(m.mk_implies(is_nan, nan_eq));
++            }
+             if (!m_fpa_util.is_fp(n)) {
+                 expr_ref wrapped(m), c(m);
+                 wrapped = m_converter.wrap(n);

@@ -1,0 +1,10 @@
+--- a/src/smt/theory_fpa.cpp
++++ b/src/smt/theory_fpa.cpp
+@@ -439,6 +439,7 @@
+ 
+     void theory_fpa::relevant_eh(expr * n) {
+         TRACE(t_fpa, tout << "relevant_eh for: " << mk_ismt2_pp(n, m) << "\n";);
++        TRACE(issue_7842, tout << "relevant node=" << n->get_id() << " raw=" << m_fpa_util.is_fp(n) << " level=" << ctx.relevancy_lvl() << "\n";);
+ 
+         mpf_manager & mpfm = m_fpa_util.fm();
+ 

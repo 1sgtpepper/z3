@@ -1,0 +1,7 @@
+(set-logic ALL)
+(declare-fun a () (_ FloatingPoint 8 24))
+(declare-fun b () (_ FloatingPoint 8 24))
+(assert (fp.isNaN a))
+(assert (fp.isNaN b))
+(assert (distinct a b))
+(check-sat)
