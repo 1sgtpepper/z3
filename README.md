@@ -17,7 +17,12 @@ interpretation of `f` satisfies every application. In the second, `x0 = NaN` and
 constant-NaN `h` satisfy every constraint. These witnesses justify the SAT oracles
 independently of the tested solver. Both families have linear-size AST DAGs.
 
-Every variant runs all 50 fixtures in four configurations: 600 process records in
+A further SAT control keeps two different nonzero payloads and opposite signs live
+through `f(raw_fp) = 0` applications. The witness `p = 1`, `q = 2`, and constant-zero
+`f` satisfies it, while trace coverage requires actual FP registration. This closes
+the old round-trip SAT control's preprocessing bypass.
+
+Every variant runs all 51 fixtures in four configurations: 612 process records in
 total. Debug builds run serially and reuse the configured build directory. Each
 process has a 30-second timeout; the job has a 60-minute timeout. The final gate
 checks both interventions only after collecting all three variants. Baseline
@@ -31,7 +36,7 @@ effective-mode list means unobserved, not disabled. Node IDs are observed runtim
 identifiers, not a proof of unique formulas across deletion, reuse, or scopes.
 Callback counts are not assertion counts, global allocation bounds, or proof of
 asymptotic performance. Durations include diagnostic tracing and process startup.
-Five focused fixtures additionally preserve native FP/core traces in every mode.
+Six focused fixtures additionally preserve native FP/core traces in every mode.
 
 Evidence includes exact inputs and oracles, source/harness identities, patches,
 build logs, binary hashes, commands, outputs, exit statuses, durations, and traces.

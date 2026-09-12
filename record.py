@@ -24,7 +24,7 @@ configurations = {
 }
 focused = {"01-issue-7842.smt2", "19-selector-core-equality.smt2",
            "26-symbolic-payloads-uf.smt2", "30-nan-round-trip-payloads.smt2",
-           "31-field-reuse-push-pop.smt2"}
+           "31-field-reuse-push-pop.smt2", "34-live-distinct-nan-payloads.smt2"}
 rows = []
 for name, oracle in expected.items():
     for configuration, options in configurations.items():

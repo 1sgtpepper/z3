@@ -151,5 +151,8 @@
   ],
   "scale-shared-32.smt2": [
     "sat"
+  ],
+  "34-live-distinct-nan-payloads.smt2": [
+    "sat"
   ]
 }
