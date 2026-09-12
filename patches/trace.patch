@@ -8,3 +8,13 @@
  
          mpf_manager & mpfm = m_fpa_util.fm();
  
+--- a/src/util/trace_tags.def
++++ b/src/util/trace_tags.def
+@@ -1017,6 +1017,7 @@
+ X(Global, subsumption_bug, "subsumption bug")
+ X(Global, subsumption_resolution, "subsumption resolution")
+ X(Global, t_fpa, "t fpa")
++X(Global, issue_7842, "FP relevance node identities and effective mode")
+ X(Global, t_fpa_detail, "t fpa detail")
+ X(Global, t_fpa_internalize, "t fpa internalize")
+ X(Global, t_str, "t str")

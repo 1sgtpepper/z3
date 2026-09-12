@@ -41,6 +41,7 @@ jobs:
           git apply --check ../diagnostic/patches/trace.patch
           git apply ../diagnostic/patches/trace.patch
           python3 scripts/mk_make.py -d 2>&1 | tee ../evidence/configure.log
+          make -C build -j1 smt/theory_fpa.o 2>&1 | tee ../evidence/instrumentation-build.log
           make -C build -j4 2>&1 | tee ../evidence/baseline-build.log
           build/z3 -version > ../evidence/version.txt
       - name: Save baseline build

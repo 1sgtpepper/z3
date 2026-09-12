@@ -24,7 +24,8 @@ checks both interventions only after collecting all three variants. Baseline
 failures are expected diagnostic data. No error, timeout, or unknown counts as a
 passing semantic result.
 
-An identical trace-only patch records effective relevancy and raw-node callbacks
+An identical trace-only patch registers its tag in `util/trace_tags.def` and records
+effective relevancy and raw-node callbacks
 in every variant. Requested relevancy 2 may be lowered by solver setup. An empty
 effective-mode list means unobserved, not disabled. Node IDs are observed runtime
 identifiers, not a proof of unique formulas across deletion, reuse, or scopes.
