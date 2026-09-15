@@ -1,50 +1,36 @@
-# Issue 7842 scoped NaN congruence validation
+# Issue 7842 final NaN congruence validation
 
-Validate the raw FP NaN identity rule at Z3
-`2d2fb04fe3f1ab2111b550645f7c49198a3165f6`, using separately checked-out
-source and transient diagnostic patches. This branch is an experiment, not a
-production patch or an upstream publication.
+Validate the selected guarded raw-NaN rule in both existing FP owners at Z3
+`2d2fb04fe3f1ab2111b550645f7c49198a3165f6`. Source is checked out
+separately and patches are applied transiently. This is a diagnostic branch.
 
-Four variants are recorded: baseline; the previous classical raw-term rule;
-that rule with a guard that skips definitely non-NaN terms; and a separate
-extension of the guarded rule to the SAT/EUF activation owner. The last variant
-investigates alternate-engine model behavior; it is not assumed to be a repair.
-No shared converter or general-rewriter change is applied in this comparison.
+The debug job reuses the exact instrumented baseline cache, records baseline and
+paired search controls, and runs the paired candidate through all 55 existing
+fixtures in six configurations. Additional native scope traces distinguish
+search backtracking from user push/pop. A trace must show the actual replay
+before that path is considered covered. The job runs all 945 enabled SMT2 cases
+at z3test `d43c5f777aa736714639741fd3f352df27520d72`, preserving expected
+and produced-output identities, and runs the complete native suite with the
+previously verified C API regression.
 
-All 55 existing fixtures and oracles are preserved. Six configurations cover
-default, explicit relevancy 0/2, no models, SAT/EUF, and relevancy 2 with structural
-branching. The latter uses auto_config=false and case_split=3 to prevent the
-quantifier-free BV setup from disabling relevancy. Native traces must establish
-actual level 2 for the raw counterexample, payload control and scope-reuse case.
-Requested options alone are not coverage evidence. Focused traces include the
-previously regressed two-field datatype SAT control.
+The release job uses the ordinary optimized build without tracing. It records
+the full semantic matrix for baseline and paired, and compares unguarded raw,
+guarded classical and paired variants against baseline on 14 SAT families.
+Independent NaN, finite and infinity families reach N=4096; shared NaN DAGs reach
+N=64. Three configurations (default, structural relevancy 2, SAT/EUF), three
+rotated-order repetitions and four variants yield 504 cost records. Every process
+has a 20-second limit. Failures and timeouts remain in the artifact alongside
+wall/CPU time, peak memory, native statistics, source identities and build flags.
+The jobs run on separate machines so native tests do not compete with cost probes.
 
-A common native C API regression runs on baseline and every candidate. It uses
-solver-local parameters, distinct source payloads, a live SAT control, and repeated
-push/pop on persistent solvers. Its baseline failure is expected evidence.
-Separate API processes exercise assumptions, cores, scopes, reset, translation and
-proof construction. Unsupported or failing alternate-engine behavior is retained.
+The original candidate, native-test and fixture bytes are unchanged from harness
+`346155e4d2c6e62a98903f7d41a3856b3694ac27`. Run 34981229254 established
+330/330 targeted results for paired, supported API lifecycle behavior in both
+engines, and full upstream/native success for guarded classical. Unsupported
+SAT/EUF proof production remains a baseline limitation. This phase fills the
+selected paired patch's broad-suite and optimized-cost gaps.
 
-Baseline and the guarded classical candidate run the conventional complete SMT2
-suite at z3test `d43c5f777aa736714639741fd3f352df27520d72`: 945 enabled
-fixtures, two workers, a 60-second limit per fixture, and retained produced outputs.
-The guarded candidate also runs the native suite. Exact build, executable, library,
-input and patch identities are preserved; cached builds are reused only when
-source identity matches. No local solver build or execution is required.
-
-Untraced debug cost probes rotate the four executable variants over three repeats
-and two configurations. Independent NaN/finite/infinity terms and shared NaN DAGs
-have explicit SAT witnesses. Each process has a 20-second limit; native statistics,
-wall time, CPU time and peak memory are saved, including failures and timeouts.
-This is bounded debug-build evidence, not a release-performance claim.
-
-The workflow's final checks establish acquisition completeness. A successful run
-does not mean every candidate passes. Production readiness requires review of all
-failures, differences, lifecycle evidence, costs and source identities.
-
-Earlier evidence: raw/broad run 34699671443; unwrap-only run 34973444790;
-repair comparison run 34976868892 at harness
-`5a24bc944f4de9ca547add74fb6328492f5c9f87`. In that comparison, raw and extended
-bridge passed all 220 classical checks. The bridge introduced an alternate-engine
-SAT model regression; static constructor normalization exhausted the rewrite-step
-limit on the second simplification. Neither alternative is carried forward here.
+The checks require selected-candidate semantic and regression success, while
+preserving baseline failures and cost limits for inspection. Finite measurements
+do not prove a bound on all solver search. Review recorded outcomes and provenance
+before drawing a readiness or performance conclusion.

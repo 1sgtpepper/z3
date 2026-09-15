@@ -8,7 +8,8 @@ import subprocess
 import sys
 import time
 
-stage, source_arg, output_arg = sys.argv[1:]
+stage, source_arg, output_arg, build = sys.argv[1:]
+assert build in {"debug", "release"}
 assert stage in {"baseline", "raw", "broad", "normalize", "bridge", "rewrite", "guarded", "paired"}
 source = Path(source_arg).resolve()
 output = Path(output_arg).resolve() / stage
@@ -35,9 +36,9 @@ for name, oracle in expected.items():
     for configuration, options in configurations.items():
         directory = output / Path(name).stem / configuration
         directory.mkdir(parents=True, exist_ok=True)
-        # Compact node events are collected in every process. Full traces are focused.
-        tags = ["-tr:issue_7842"]
-        if name in focused:
+        # Debug runs collect compact events; full traces are limited to focused cases.
+        tags = ["-tr:issue_7842"] if build == "debug" else []
+        if build == "debug" and name in focused:
             tags += ["-tr:t_fpa", "-tr:t_fpa_detail", "-tr:t_fpa_internalize",
                      "-tr:add_eq", "-tr:add_diseq", "-tr:final_check", "-tr:get_model"]
         command = [str(solver), *tags, *options, str(cases / name)]

@@ -1,4 +1,4 @@
-"""CI-only, untraced and paired debug-build cost observations."""
+"""CI-only, untraced cost observations from identified candidate binaries."""
 
 import hashlib
 import json
@@ -16,13 +16,14 @@ stages = ["baseline", "raw", "guarded", "paired"]
 binary_hashes = {stage: hashlib.sha256((executables / stage / "z3").read_bytes()).hexdigest()
                  for stage in stages}
 configurations = {
+    "euf": ["sat.euf=true", "model=false", "model_validate=false"],
     "default": ["model=false", "model_validate=false"],
     "structural": ["auto_config=false", "smt.relevancy=2", "smt.case_split=3",
                    "model=false", "model_validate=false"],
 }
 fixtures = {}
-for kind, sizes in (("nan", (16, 128, 512)), ("finite", (128, 512)),
-                    ("infinity", (128, 512))):
+for kind, sizes in (("nan", (16, 128, 512, 4096)), ("finite", (128, 512, 4096)),
+                    ("infinity", (128, 512, 4096))):
     for size in sizes:
         lines = ["(set-logic ALL)", "(declare-fun f ((_ FloatingPoint 3 3)) Int)"]
         for i in range(size):
@@ -34,7 +35,7 @@ for kind, sizes in (("nan", (16, 128, 512)), ("finite", (128, 512)),
             payload = "#b00" if kind == "infinity" else f"p{i}"
             lines.append(f"(assert (= (f (fp s{i} {exponent} {payload})) 0))")
         fixtures[f"{kind}-{size}"] = "\n".join([*lines, "(check-sat)", ""])
-for size in (8, 16, 32):
+for size in (8, 16, 32, 64):
     lines = ["(set-logic ALL)", "(declare-const x0 (_ FloatingPoint 3 3))",
              "(declare-fun h ((_ FloatingPoint 3 3) (_ FloatingPoint 3 3)) (_ FloatingPoint 3 3))",
              "(assert (fp.isNaN x0))"]
