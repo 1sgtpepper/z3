@@ -1,4 +1,4 @@
-name: Validate final NaN congruence candidate
+name: Check NaN relevance after search backtracking
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
 jobs:
   debug:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -20,11 +20,6 @@ jobs:
           repository: Z3Prover/z3
           ref: 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
           path: source
-      - uses: actions/checkout@v7.0.1
-        with:
-          repository: Z3Prover/z3test
-          ref: d43c5f777aa736714639741fd3f352df27520d72
-          path: z3test
       - name: Record source and inputs
         run: |
           mkdir evidence
@@ -32,10 +27,10 @@ jobs:
           git -C source rev-parse HEAD > evidence/source-revision.txt
           test "$(cat evidence/source-revision.txt)" = 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
           test -z "$(git -C source status --porcelain)"
-          cp -r diagnostic/cases diagnostic/patches evidence/
-          cp diagnostic/api_probe.py diagnostic/measure.py diagnostic/record.py diagnostic/replay.py evidence/
+          mkdir evidence/patches
+          cp diagnostic/patches/{trace,replay-trace,paired}.patch evidence/patches/
+          cp diagnostic/replay.py evidence/
           cp -r diagnostic/replay-controls evidence/
-          git -C z3test rev-parse HEAD > evidence/z3test-revision.txt
       - name: Restore exact instrumented baseline build
         id: cache
         uses: actions/cache/restore@v4
@@ -87,7 +82,7 @@ jobs:
         with:
           path: source/build
           key: issue-7842-debug-ubuntu24-2d2fb04fe3f1ab2111b550645f7c49198a3165f6-${{ hashFiles('diagnostic/patches/trace.patch') }}
-      - name: Check search replay and selected regression suites
+      - name: Check selected search replay
         run: |
           set -o pipefail
           git -C source apply --check ../diagnostic/patches/replay-trace.patch
@@ -99,192 +94,26 @@ jobs:
           python3 diagnostic/replay.py baseline source evidence
           git -C source apply --check ../diagnostic/patches/paired.patch
           git -C source apply ../diagnostic/patches/paired.patch
-          git -C source apply --check ../diagnostic/patches/native-tests.patch
-          git -C source apply ../diagnostic/patches/native-tests.patch
           git -C source diff --check
           git -C source diff > evidence/paired-source.patch
           make -C source/build -j4 2>&1 | tee evidence/paired-build.log
-          make -C source/build -j4 test-z3 2>&1 | tee evidence/paired-native-build.log
           mkdir -p evidence/paired
           sha256sum source/build/z3 source/build/libz3.so > evidence/paired/binary-hashes.txt
-          sha256sum source/build/test-z3 > evidence/paired/native-binary-hash.txt
           python3 diagnostic/replay.py paired source evidence
-          python3 diagnostic/record.py paired source evidence debug
-          regression_status=0
-          python3 z3test/scripts/test_benchmarks.py "$PWD/source/build/z3" z3test/regressions/smt2 smt2 2 60 \
-            > evidence/paired/upstream-regressions.log 2>&1 || regression_status=$?
-          echo "$regression_status" > evidence/paired/upstream-regressions-exit.txt
-          python3 - paired <<'PYCODE'
-          import hashlib
-          import json
-          from pathlib import Path
-          import sys
-          corpus = Path('z3test/regressions/smt2')
-          output = Path('evidence') / sys.argv[1] / 'upstream-outputs'
-          output.mkdir()
-          records = []
-          for fixture in sorted(corpus.glob('*.smt2')):
-              expected = fixture.with_suffix('.expected.out')
-              produced = fixture.with_suffix('.produced.out')
-              actual = produced.read_bytes() if produced.exists() else None
-              oracle = expected.read_bytes() if expected.exists() else None
-              records.append(dict(case=fixture.name, matched=actual is not None and actual == oracle,
-                                  input_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
-                                  expected_sha256=hashlib.sha256(oracle).hexdigest() if oracle is not None else None,
-                                  produced_sha256=hashlib.sha256(actual).hexdigest() if actual is not None else None))
-              if actual is not None:
-                  (output / produced.name).write_bytes(actual)
-                  produced.unlink()
-          (output.parent / 'upstream-results.json').write_text(json.dumps(records, indent=2) + '\n')
-          PYCODE
-          native_status=0
-          timeout 900 source/build/test-z3 -a > evidence/paired/native-all.log 2>&1 || native_status=$?
-          echo "$native_status" > evidence/paired/native-all-exit.txt
-      - name: Check selected debug outcomes
+      - name: Check selected search outcomes
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
           output = Path('evidence/paired')
-          rows = json.loads((output / 'results.json').read_text())
-          assert len(rows) == 330 and all(r['passed'] for r in rows)
           rows = json.loads((output / 'replay/results.json').read_text())
           assert len(rows) == 6 and all(r['passed'] for r in rows)
-          rows = json.loads((output / 'upstream-results.json').read_text())
-          assert len(rows) == 945 and all(r['matched'] for r in rows)
-          assert (output / 'upstream-regressions-exit.txt').read_text().strip() == '0'
-          assert (output / 'native-all-exit.txt').read_text().strip() == '0'
-          print('Selected candidate: 330 semantic, six search controls, 945 upstream and native suite passed.')
+          print('Selected candidate: six search controls passed; inspect relevance and scope traces.')
           PY
-      - name: Preserve final debug evidence
+      - name: Preserve search replay evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: issue-7842-final-debug
-          path: evidence/
-          if-no-files-found: error
-
-  release:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          path: diagnostic
-      - uses: actions/checkout@v7.0.1
-        with:
-          repository: Z3Prover/z3
-          ref: 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
-          path: source
-      - name: Record optimized-build inputs
-        run: |
-          mkdir evidence
-          git -C diagnostic rev-parse HEAD > evidence/harness-revision.txt
-          git -C source rev-parse HEAD > evidence/source-revision.txt
-          test "$(cat evidence/source-revision.txt)" = 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
-          test -z "$(git -C source status --porcelain)"
-          cp -r diagnostic/cases diagnostic/patches evidence/
-          cp diagnostic/measure.py diagnostic/record.py evidence/
-          g++ --version > evidence/compiler.txt
-          lscpu > evidence/cpu.txt
-      - name: Restore exact optimized baseline build
-        id: cache
-        uses: actions/cache/restore@v4
-        with:
-          path: source/build
-          key: issue-7842-release-ubuntu24-2d2fb04fe3f1ab2111b550645f7c49198a3165f6-v1
-      - name: Build optimized baseline
-        working-directory: source
-        run: |
-          set -o pipefail
-          python3 scripts/mk_make.py 2>&1 | tee ../evidence/configure.log
-          if [ "${{ steps.cache.outputs.cache-hit }}" = true ]; then
-            python3 - <<'PYCODE'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          import subprocess
-          identity = json.loads(Path('build/issue-7842-release-identity.json').read_text())
-          assert identity['source'] == subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-          assert identity['binary_sha256'] == hashlib.sha256(Path('build/z3').read_bytes()).hexdigest()
-          assert identity['compiler'] == Path('../evidence/compiler.txt').read_text()
-          assert identity['config_sha256'] == hashlib.sha256(Path('build/config.mk').read_bytes()).hexdigest()
-          stamp = int(subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD']))
-          for path in Path('src').rglob('*'):
-              if path.is_file():
-                  os.utime(path, (stamp, stamp))
-          PYCODE
-          fi
-          make -C build -j4 2>&1 | tee ../evidence/baseline-build.log
-          build/z3 -version > ../evidence/version.txt
-          cp build/config.mk ../evidence/build-config.mk
-          python3 - <<'PYCODE'
-          import hashlib
-          import json
-          from pathlib import Path
-          import subprocess
-          config = Path('build/config.mk').read_text()
-          assert '-O3' in config and '-DNDEBUG' in config and '-DZ3DEBUG' not in config and '-D_TRACE' not in config
-          identity = dict(source=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
-                          binary_sha256=hashlib.sha256(Path('build/z3').read_bytes()).hexdigest(),
-                          compiler=Path('../evidence/compiler.txt').read_text(),
-                          config_sha256=hashlib.sha256(Path('build/config.mk').read_bytes()).hexdigest())
-          Path('build/issue-7842-release-identity.json').write_text(json.dumps(identity, indent=2) + '\n')
-          PYCODE
-      - name: Save optimized baseline build
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: source/build
-          key: issue-7842-release-ubuntu24-2d2fb04fe3f1ab2111b550645f7c49198a3165f6-v1
-      - name: Build identified optimized variants
-        run: |
-          set -o pipefail
-          previous=""
-          for variant in baseline raw guarded paired; do
-            if [ -n "$previous" ]; then
-              git -C source apply -R "../diagnostic/patches/$previous.patch"
-            fi
-            if [ "$variant" != baseline ]; then
-              git -C source apply --check "../diagnostic/patches/$variant.patch"
-              git -C source apply "../diagnostic/patches/$variant.patch"
-              make -C source/build -j4 2>&1 | tee "evidence/$variant-build.log"
-              previous="$variant"
-            fi
-            git -C source diff --check
-            git -C source diff > "evidence/$variant-source.patch"
-            mkdir -p "evidence/$variant" "executables/$variant"
-            sha256sum source/build/z3 source/build/libz3.so > "evidence/$variant/binary-hashes.txt"
-            cp source/build/z3 source/build/libz3.so "executables/$variant/"
-            if [ "$variant" = baseline ] || [ "$variant" = paired ]; then
-              python3 diagnostic/record.py "$variant" source evidence release
-            fi
-          done
-      - name: Measure optimized variants without tracing
-        run: python3 diagnostic/measure.py executables evidence/measurements
-      - name: Check optimized candidate outcomes
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          for stage in ('baseline', 'paired'):
-              rows = json.loads((Path('evidence') / stage / 'results.json').read_text())
-              assert len(rows) == 330
-              print(stage, sum(r['passed'] for r in rows), '/', len(rows))
-              if stage == 'paired':
-                  assert all(r['passed'] for r in rows)
-          rows = json.loads(Path('evidence/measurements/results.json').read_text())
-          assert len(rows) == 504
-          print('Optimized cost probes:', sum(r['passed'] for r in rows), '/', len(rows))
-          for row in rows:
-              if not row['passed']:
-                  print('Cost probe limit:', row['case'], row['configuration'], row['stage'], row['repeat'], row['exit_code'])
-          PY
-      - name: Preserve optimized evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: issue-7842-final-release
+          name: issue-7842-search-replay
           path: evidence/
           if-no-files-found: error

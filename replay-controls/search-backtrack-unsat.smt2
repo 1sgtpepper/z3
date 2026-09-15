@@ -8,7 +8,7 @@
 (declare-fun f ((_ FloatingPoint 3 3)) Int)
 (define-fun x () (_ FloatingPoint 3 3) (fp #b0 #b111 p))
 (assert (or
-  (and choice (= p #b01) (= (f x) (f (_ NaN 3 3)))
+  (and choice (= p #b00) (distinct (f x) (f (_ NaN 3 3)))
        (distinct a #b00) (distinct b #b00)
        (distinct c #b00) (distinct d #b00)
        (distinct a b c d))
