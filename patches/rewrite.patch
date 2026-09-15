@@ -1,0 +1,18 @@
+--- a/src/ast/rewriter/fpa_rewriter.cpp
++++ b/src/ast/rewriter/fpa_rewriter.cpp
+@@ -911,7 +911,14 @@
+         return BR_DONE;
+     }
+ 
+-    return BR_FAILED;
++    bv_util& bu = m_util.bu();
++    unsigned ebits = bu.get_bv_size(exp), sbits = bu.get_bv_size(sig) + 1;
++    expr_ref raw(m_util.mk_fp(sgn, exp, sig), m());
++    expr_ref exp_top(m().mk_eq(exp, bu.mk_numeral(rational::power_of_two(ebits) - rational(1), ebits)), m());
++    expr_ref sig_zero(m().mk_eq(sig, bu.mk_numeral(0, sbits - 1)), m());
++    expr_ref is_nan(m().mk_and(exp_top, m().mk_not(sig_zero)), m());
++    result = m().mk_ite(is_nan, m_util.mk_nan(ebits, sbits), raw);
++    return BR_DONE;
+ }
+ 
+ br_status fpa_rewriter::mk_to_bv(func_decl * f, expr * arg1, expr * arg2, bool is_signed, expr_ref & result) {

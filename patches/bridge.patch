@@ -1,0 +1,42 @@
+--- a/src/ast/fpa/fpa2bv_converter.cpp
++++ b/src/ast/fpa/fpa2bv_converter.cpp
+@@ -4601,9 +4601,14 @@
+         SASSERT(m_util.is_float(s));
+         unsigned sbits = m_util.get_sbits(s);
+         SASSERT(bv_sz == m_util.get_ebits(s) + sbits);
+-        res = m_util.mk_fp(m_bv_util.mk_extract(bv_sz - 1, bv_sz - 1, e),
+-            m_bv_util.mk_extract(bv_sz - 2, sbits - 1, e),
+-            m_bv_util.mk_extract(sbits - 2, 0, e));
++        expr_ref sgn(m), exp(m), sig(m);
++        m_rw(m_bv_util.mk_extract(bv_sz - 1, bv_sz - 1, e), sgn);
++        m_rw(m_bv_util.mk_extract(bv_sz - 2, sbits - 1, e), exp);
++        m_rw(m_bv_util.mk_extract(sbits - 2, 0, e), sig);
++        res = m_util.mk_fp(sgn, exp, sig);
++        expr_ref is_nan(m);
++        mk_is_nan(res, is_nan);
++        res = m.mk_ite(is_nan, m_util.mk_nan(s), res);
+     }
+ 
+     return res;
+--- a/src/smt/theory_fpa.cpp
++++ b/src/smt/theory_fpa.cpp
+@@ -443,7 +443,7 @@
+         mpf_manager & mpfm = m_fpa_util.fm();
+ 
+         if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+-            if (!m_fpa_util.is_fp(n)) {
++            {
+                 expr_ref wrapped(m), c(m);
+                 wrapped = m_converter.wrap(n);
+                 mpf_rounding_mode rm;
+--- a/src/sat/smt/fpa_solver.cpp
++++ b/src/sat/smt/fpa_solver.cpp
+@@ -219,7 +219,7 @@
+         }
+         else if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+             expr* a = nullptr, * b = nullptr, * c = nullptr;
+-            if (!m_fpa_util.is_fp(n)) {
++            {
+                 app_ref wrapped = m_converter.wrap(n);
+                 mpf_rounding_mode rm;
+                 scoped_mpf val(mpfm);

@@ -9,7 +9,7 @@ import sys
 import time
 
 stage, source_arg, output_arg = sys.argv[1:]
-assert stage in {"baseline", "raw", "broad", "normalize"}
+assert stage in {"baseline", "raw", "broad", "normalize", "bridge", "rewrite"}
 source = Path(source_arg).resolve()
 output = Path(output_arg).resolve() / stage
 output.mkdir(parents=True, exist_ok=True)
@@ -21,10 +21,13 @@ configurations = {
     "relevancy-0": ["auto_config=false", "smt.relevancy=0", "model_validate=true"],
     "relevancy-2": ["auto_config=false", "smt.relevancy=2", "model_validate=true"],
     "no-model": ["model=false", "model_validate=false"],
+    "euf": ["sat.euf=true", "model_validate=true"],
 }
 focused = {"01-issue-7842.smt2", "19-selector-core-equality.smt2",
            "26-symbolic-payloads-uf.smt2", "30-nan-round-trip-payloads.smt2",
-           "31-field-reuse-push-pop.smt2", "34-live-distinct-nan-payloads.smt2"}
+           "31-field-reuse-push-pop.smt2", "34-live-distinct-nan-payloads.smt2",
+           "35-raw-uf-with-arithmetic.smt2", "36-raw-payloads-with-arithmetic.smt2",
+           "37-raw-uf-push-pop.smt2", "38-bridge-distinct-payloads.smt2"}
 rows = []
 for name, oracle in expected.items():
     for configuration, options in configurations.items():
@@ -49,11 +52,15 @@ for name, oracle in expected.items():
         actual = [line for line in stdout.splitlines() if line in {"sat", "unsat", "unknown"}]
         passed = code == 0 and actual == oracle and "(error" not in stdout and not stderr
         trace = directory / ".z3-trace"
-        levels, nodes, raw_nodes, events = set(), set(), set(), 0
+        levels, nodes, raw_nodes, engines, events = set(), set(), set(), set(), 0
         if trace.exists():
             trace = trace.rename(directory / "trace.log")
             with trace.open(errors="replace") as stream:
                 for line in stream:
+                    if 'src/sat/smt/fpa_solver.cpp:' in line:
+                        engines.add('sat-euf')
+                    if 'src/smt/theory_fpa.cpp:' in line:
+                        engines.add('classical-smt')
                     match = re.search(r"relevant node=(\d+) raw=([01]) level=(\d+)", line)
                     if match:
                         node, raw, level = map(int, match.groups())
@@ -65,6 +72,7 @@ for name, oracle in expected.items():
         row = dict(case=name, configuration=configuration, expected=oracle, actual=actual,
                    exit_code=code, passed=passed, elapsed_seconds=elapsed, command=command,
                    stdout=stdout, stderr=stderr, effective_relevancy=sorted(levels),
+                   observed_fp_engines=sorted(engines),
                    relevance_events=events, distinct_observed_node_ids=len(nodes),
                    distinct_observed_raw_node_ids=len(raw_nodes),
                    trace_bytes=trace.stat().st_size if trace.exists() else 0)

@@ -154,5 +154,19 @@
   ],
   "34-live-distinct-nan-payloads.smt2": [
     "sat"
+  ],
+  "35-raw-uf-with-arithmetic.smt2": [
+    "unsat"
+  ],
+  "36-raw-payloads-with-arithmetic.smt2": [
+    "sat"
+  ],
+  "37-raw-uf-push-pop.smt2": [
+    "unsat",
+    "sat",
+    "unsat"
+  ],
+  "38-bridge-distinct-payloads.smt2": [
+    "sat"
   ]
 }
