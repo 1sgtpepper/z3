@@ -1,4 +1,4 @@
-name: Compare issue 7842 NaN identity repairs
+name: Validate scoped NaN congruence
 
 on:
   push:
@@ -20,6 +20,11 @@ jobs:
           repository: Z3Prover/z3
           ref: 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
           path: source
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: Z3Prover/z3test
+          ref: d43c5f777aa736714639741fd3f352df27520d72
+          path: z3test
       - name: Record source and inputs
         run: |
           mkdir evidence
@@ -28,6 +33,8 @@ jobs:
           test "$(cat evidence/source-revision.txt)" = 2d2fb04fe3f1ab2111b550645f7c49198a3165f6
           test -z "$(git -C source status --porcelain)"
           cp -r diagnostic/cases diagnostic/patches evidence/
+          cp diagnostic/api_probe.py diagnostic/measure.py diagnostic/record.py evidence/
+          git -C z3test rev-parse HEAD > evidence/z3test-revision.txt
       - name: Restore exact instrumented baseline build
         id: cache
         uses: actions/cache/restore@v4
@@ -79,11 +86,17 @@ jobs:
         with:
           path: source/build
           key: issue-7842-debug-ubuntu24-2d2fb04fe3f1ab2111b550645f7c49198a3165f6-${{ hashFiles('diagnostic/patches/trace.patch') }}
-      - name: Record all variants
+      - name: Build native regression
+        run: |
+          set -o pipefail
+          git -C source apply --check ../diagnostic/patches/native-tests.patch
+          git -C source apply ../diagnostic/patches/native-tests.patch
+          make -C source/build -j4 test-z3 2>&1 | tee evidence/native-build.log
+      - name: Record candidates and regression evidence
         run: |
           set -o pipefail
           previous=""
-          for variant in baseline raw bridge rewrite; do
+          for variant in baseline raw guarded paired; do
             if [ -n "$previous" ]; then
               git -C source apply -R "../diagnostic/patches/$previous.patch"
             fi
@@ -91,50 +104,97 @@ jobs:
               git -C source apply --check "../diagnostic/patches/$variant.patch"
               git -C source apply "../diagnostic/patches/$variant.patch"
               make -C source/build -j4 2>&1 | tee "evidence/$variant-build.log"
+              make -C source/build -j4 test-z3 2>&1 | tee "evidence/$variant-native-build.log"
               previous="$variant"
             fi
             git -C source diff --check
             git -C source diff > "evidence/$variant-source.patch"
             mkdir -p "evidence/$variant"
             sha256sum source/build/z3 source/build/libz3.so > "evidence/$variant/binary-hashes.txt"
-            probe_status=0
-            PYTHONPATH="$PWD/source/build/python" Z3_LIBRARY_PATH="$PWD/source/build" LD_LIBRARY_PATH="$PWD/source/build" \
-              timeout 15s python3 diagnostic/rewrite_probe.py > "evidence/$variant/rewrite-probe.json" \
-              2> "evidence/$variant/rewrite-probe.stderr" || probe_status=$?
-            echo "$probe_status" > "evidence/$variant/rewrite-probe-exit.txt"
-            if [ "$probe_status" != 0 ]; then
-              echo "Rejecting $variant after rewrite probe failure: $probe_status"
-              continue
-            fi
+            sha256sum source/build/test-z3 > "evidence/$variant/native-binary-hash.txt"
+            mkdir -p "executables/$variant"
+            cp source/build/z3 source/build/libz3.so "executables/$variant/"
+            native_status=0
+            timeout 120 source/build/test-z3 fpa > "evidence/$variant/native-fpa.log" 2>&1 || native_status=$?
+            echo "$native_status" > "evidence/$variant/native-fpa-exit.txt"
+            for mode in default relevancy-0 relevancy-2 relevancy-2-structural euf; do
+              api_status=0
+              PYTHONPATH="$PWD/source/build/python" Z3_LIBRARY_PATH="$PWD/source/build" LD_LIBRARY_PATH="$PWD/source/build" \
+                timeout 90 python3 diagnostic/api_probe.py "$mode" > "evidence/$variant/api-$mode.json" \
+                2> "evidence/$variant/api-$mode.stderr" || api_status=$?
+              echo "$api_status" > "evidence/$variant/api-$mode-exit.txt"
+            done
             python3 diagnostic/record.py "$variant" source evidence
+            if [ "$variant" = baseline ] || [ "$variant" = guarded ]; then
+              regression_status=0
+              python3 z3test/scripts/test_benchmarks.py "$PWD/source/build/z3" z3test/regressions/smt2 smt2 2 60 \
+                > "evidence/$variant/upstream-regressions.log" 2>&1 || regression_status=$?
+              echo "$regression_status" > "evidence/$variant/upstream-regressions-exit.txt"
+              python3 - "$variant" <<'PYCODE'
+          import hashlib
+          import json
+          from pathlib import Path
+          import sys
+          corpus = Path('z3test/regressions/smt2')
+          output = Path('evidence') / sys.argv[1] / 'upstream-outputs'
+          output.mkdir()
+          records = []
+          for fixture in sorted(corpus.glob('*.smt2')):
+              expected = fixture.with_suffix('.expected.out')
+              produced = fixture.with_suffix('.produced.out')
+              actual = produced.read_bytes() if produced.exists() else None
+              oracle = expected.read_bytes() if expected.exists() else None
+              records.append(dict(case=fixture.name, matched=actual is not None and actual == oracle,
+                                  input_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),
+                                  expected_sha256=hashlib.sha256(oracle).hexdigest() if oracle is not None else None,
+                                  produced_sha256=hashlib.sha256(actual).hexdigest() if actual is not None else None))
+              if actual is not None:
+                  (output / produced.name).write_bytes(actual)
+                  produced.unlink()
+          (output.parent / 'upstream-results.json').write_text(json.dumps(records, indent=2) + '\n')
+          PYCODE
+            fi
+            if [ "$variant" = guarded ]; then
+              native_all_status=0
+              timeout 900 source/build/test-z3 -a > evidence/guarded/native-all.log 2>&1 || native_all_status=$?
+              echo "$native_all_status" > evidence/guarded/native-all-exit.txt
+            fi
           done
-      - name: Evaluate semantic outcomes and trace coverage
+      - name: Record paired untraced costs
+        run: python3 diagnostic/measure.py executables evidence/measurements
+      - name: Summarize semantic outcomes and trace coverage
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
-          for stage in ('baseline', 'raw', 'bridge', 'rewrite'):
-              probe_status = int((Path('evidence') / stage / 'rewrite-probe-exit.txt').read_text())
-              if probe_status:
-                  print(stage, 'rejected by rewrite progress probe:', probe_status)
-                  continue
+          for stage in ('baseline', 'raw', 'guarded', 'paired'):
               rows = json.loads((Path('evidence') / stage / 'results.json').read_text())
-              assert len(rows) == 275, (stage, len(rows))
-              assert len({(r['case'], r['configuration']) for r in rows}) == 275
+              assert len(rows) == 330, (stage, len(rows))
+              assert len({(r['case'], r['configuration']) for r in rows}) == 330
               print(stage, sum(r['passed'] for r in rows), '/', len(rows))
               for row in rows:
                   if not row['passed']:
                       print('Unresolved:', row['case'], row['configuration'], row['actual'], row['expected'], row['exit_code'])
-              for case in ('01-issue-7842.smt2', '26-symbolic-payloads-uf.smt2', '35-raw-uf-with-arithmetic.smt2', '38-bridge-distinct-payloads.smt2'):
-                  for mode in ('relevancy-0', 'relevancy-2', 'euf'):
-                      row = next(r for r in rows if r['case'] == case and r['configuration'] == mode)
-                      print('Coverage:', stage, case, mode, row['effective_relevancy'], row['observed_fp_engines'])
-          assert (Path('evidence') / 'baseline' / 'results.json').exists(), 'baseline probe must succeed'
+              for case in ('26-symbolic-payloads-uf.smt2', '34-live-distinct-nan-payloads.smt2', '37-raw-uf-push-pop.smt2'):
+                  row = next(r for r in rows if r['case'] == case and r['configuration'] == 'relevancy-2-structural')
+                  print('Coverage:', stage, case, row['effective_relevancy'], row['observed_fp_engines'])
+                  assert row['effective_relevancy'] == [2], (stage, case, row['effective_relevancy'])
+              for mode in ('default', 'relevancy-0', 'relevancy-2', 'relevancy-2-structural', 'euf'):
+                  print('API:', stage, mode, (Path('evidence') / stage / f'api-{mode}-exit.txt').read_text().strip())
+              print('Native FP:', stage, (Path('evidence') / stage / 'native-fpa-exit.txt').read_text().strip())
+          for stage in ('baseline', 'guarded'):
+              rows = json.loads((Path('evidence') / stage / 'upstream-results.json').read_text())
+              assert len(rows) == 945, (stage, len(rows))
+              print('Upstream:', stage, sum(r['matched'] for r in rows), '/', len(rows))
+          print('Native all:', Path('evidence/guarded/native-all-exit.txt').read_text().strip())
+          measurements = json.loads(Path('evidence/measurements/results.json').read_text())
+          assert len(measurements) == 240, len(measurements)
+          print('Cost probes:', sum(r['passed'] for r in measurements), '/', len(measurements))
           PY
       - name: Preserve diagnostic evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: issue-7842-repair-comparison
+          name: issue-7842-lifecycle-validation
           path: evidence/
           if-no-files-found: error

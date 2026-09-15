@@ -9,7 +9,7 @@ import sys
 import time
 
 stage, source_arg, output_arg = sys.argv[1:]
-assert stage in {"baseline", "raw", "broad", "normalize", "bridge", "rewrite"}
+assert stage in {"baseline", "raw", "broad", "normalize", "bridge", "rewrite", "guarded", "paired"}
 source = Path(source_arg).resolve()
 output = Path(output_arg).resolve() / stage
 output.mkdir(parents=True, exist_ok=True)
@@ -20,10 +20,12 @@ configurations = {
     "default": ["model_validate=true"],
     "relevancy-0": ["auto_config=false", "smt.relevancy=0", "model_validate=true"],
     "relevancy-2": ["auto_config=false", "smt.relevancy=2", "model_validate=true"],
+    "relevancy-2-structural": ["auto_config=false", "smt.relevancy=2", "smt.case_split=3", "model_validate=true"],
     "no-model": ["model=false", "model_validate=false"],
     "euf": ["sat.euf=true", "model_validate=true"],
 }
 focused = {"01-issue-7842.smt2", "19-selector-core-equality.smt2",
+           "22-second-field-can-differ.smt2",
            "26-symbolic-payloads-uf.smt2", "30-nan-round-trip-payloads.smt2",
            "31-field-reuse-push-pop.smt2", "34-live-distinct-nan-payloads.smt2",
            "35-raw-uf-with-arithmetic.smt2", "36-raw-payloads-with-arithmetic.smt2",

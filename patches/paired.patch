@@ -1,0 +1,41 @@
+--- a/src/smt/theory_fpa.cpp
++++ b/src/smt/theory_fpa.cpp
+@@ -443,7 +443,16 @@
+         mpf_manager & mpfm = m_fpa_util.fm();
+ 
+         if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+-            if (!m_fpa_util.is_fp(n)) {
++            if (m_fpa_util.is_fp(n)) {
++                // Raw NaN encodings share one SMT value for congruence,
++                // without restricting their original sign or payload bits.
++                expr_ref is_nan(m);
++                app_ref nan_test(m_fpa_util.mk_is_nan(n), m);
++                m_converter.mk_is_nan(nan_test->get_decl(), 1, nan_test->get_args(), is_nan);
++                if (!m.is_false(is_nan))
++                    assert_cnstr(m.mk_implies(is_nan, m.mk_eq(n, m_fpa_util.mk_nan(n->get_sort()))));
++            }
++            else {
+                 expr_ref wrapped(m), c(m);
+                 wrapped = m_converter.wrap(n);
+                 mpf_rounding_mode rm;
+--- a/src/sat/smt/fpa_solver.cpp
++++ b/src/sat/smt/fpa_solver.cpp
+@@ -219,7 +219,17 @@
+         }
+         else if (m_fpa_util.is_float(n) || m_fpa_util.is_rm(n)) {
+             expr* a = nullptr, * b = nullptr, * c = nullptr;
+-            if (!m_fpa_util.is_fp(n)) {
++            if (m_fpa_util.is_fp(n)) {
++                expr_ref is_nan(m);
++                app_ref nan_test(m_fpa_util.mk_is_nan(n), m);
++                m_converter.mk_is_nan(nan_test->get_decl(), 1, nan_test->get_args(), is_nan);
++                if (!m.is_false(is_nan)) {
++                    sat::literal condition = mk_literal(is_nan);
++                    sat::literal equality = eq_internalize(n, m_fpa_util.mk_nan(n->get_sort()));
++                    add_clause(~condition, equality);
++                }
++            }
++            else {
+                 app_ref wrapped = m_converter.wrap(n);
+                 mpf_rounding_mode rm;
+                 scoped_mpf val(mpfm);

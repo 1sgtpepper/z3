@@ -1,53 +1,50 @@
-# Issue 7842 NaN identity repair comparison
+# Issue 7842 scoped NaN congruence validation
 
-Compare baseline Z3, the prior raw-node equality rule, an expanded normalized decode
-bridge, and static raw-constructor normalization at upstream
-`2d2fb04fe3f1ab2111b550645f7c49198a3165f6`. Source is checked out separately;
-semantic patches are applied only in fork CI. This is an experiment, not a
-production patch or a claim that any candidate is complete.
+Validate the raw FP NaN identity rule at Z3
+`2d2fb04fe3f1ab2111b550645f7c49198a3165f6`, using separately checked-out
+source and transient diagnostic patches. This branch is an experiment, not a
+production patch or an upstream publication.
 
-The bridge candidate normalizes decoded NaN values and admits raw FP terms to the
-existing bridge in both FP engines. It simplifies the BV extracts first, so a raw
-wrap/decode round trip refers back to the original raw term. The conditional bridge
-on a raw term imposes the same semantic implication as the raw-node rule; it is not
-axiom-free. The static candidate returns a conditional NaN value from the general
-raw-constructor rewriter. Its repeated-rewrite behavior is an explicit risk.
+Four variants are recorded: baseline; the previous classical raw-term rule;
+that rule with a guard that skips definitely non-NaN terms; and a separate
+extension of the guarded rule to the SAT/EUF activation owner. The last variant
+investigates alternate-engine model behavior; it is not assumed to be a repair.
+No shared converter or general-rewriter change is applied in this comparison.
 
-The raw-node rule changes only the classical SMT engine. SAT/EUF runs expose that
-scope rather than implying the classical patch fixes both engines. Shared converter
-and general-rewriter edits must also account for their alternate-engine consumers.
+All 55 existing fixtures and oracles are preserved. Six configurations cover
+default, explicit relevancy 0/2, no models, SAT/EUF, and relevancy 2 with structural
+branching. The latter uses auto_config=false and case_split=3 to prevent the
+quantifier-free BV setup from disabling relevancy. Native traces must establish
+actual level 2 for the raw counterexample, payload control and scope-reuse case.
+Requested options alone are not coverage evidence. Focused traces include the
+previously regressed two-field datatype SAT control.
 
-The 51 existing fixtures and their oracles are retained. Four additions exercise
-raw terms alongside nonlinear arithmetic (to investigate actual relevancy 2), live
-distinct payloads with that arithmetic, raw-term push/pop reuse, and distinct
-payloads linked through FP-returning UF applications. The arithmetic SAT witness
-is a = 2. The payload SAT witnesses use p = 1, q = 2, constant-NaN g and constant-zero
-f. Raw NaN disequalities have UNSAT oracles by singleton NaN and congruence.
+A common native C API regression runs on baseline and every candidate. It uses
+solver-local parameters, distinct source payloads, a live SAT control, and repeated
+push/pop on persistent solvers. Its baseline failure is expected evidence.
+Separate API processes exercise assumptions, cores, scopes, reset, translation and
+proof construction. Unsupported or failing alternate-engine behavior is retained.
 
-Each completed variant runs 55 fixtures in five configurations: default, explicit
-relevancy 0/2, no model generation, and sat.euf=true. Commands, actual modes and
-observed FP engines are recorded. A requested mode is never proof of effective
-mode. Ten focused cases retain native FP/core traces; all cases retain compact
-classical relevance events. Unobserved engine/mode means unobserved.
+Baseline and the guarded classical candidate run the conventional complete SMT2
+suite at z3test `d43c5f777aa736714639741fd3f352df27520d72`: 945 enabled
+fixtures, two workers, a 60-second limit per fixture, and retained produced outputs.
+The guarded candidate also runs the native suite. Exact build, executable, library,
+input and patch identities are preserved; cached builds are reused only when
+source identity matches. No local solver build or execution is required.
 
-Before the sweep, a bounded Python probe repeatedly simplifies a symbolic raw FP
-term and records DAG sizes and structural stability. It has a 10,000-step limit
-per simplification and a 15-second process timeout. Failure rejects that candidate
-before the full sweep; partial evidence is preserved. Probe stability alone does
-not prove semantic correctness. Each solver process has a 30-second timeout.
+Untraced debug cost probes rotate the four executable variants over three repeats
+and two configurations. Independent NaN/finite/infinity terms and shared NaN DAGs
+have explicit SAT witnesses. Each process has a 20-second limit; native statistics,
+wall time, CPU time and peak memory are saved, including failures and timeouts.
+This is bounded debug-build evidence, not a release-performance claim.
 
-The workflow records all wrong answers, errors, unknowns and timeouts as failures
-in the data. Its final check establishes acquisition completeness, not that every
-candidate is a repair. Successful CI does not mean all semantic cases pass. Native
-builds run serially, reuse the build cache where valid, and preserve exact source,
-patch, binary and process identities. The current-source cache is saved before
-applying any semantic candidate. Old-source cache objects are rebuilt normally.
+The workflow's final checks establish acquisition completeness. A successful run
+does not mean every candidate passes. Production readiness requires review of all
+failures, differences, lifecycle evidence, costs and source identities.
 
-The earlier raw/broad comparison is run 34699671443 at harness
-`af7088aa037bb47ce18ed5056b5c2d3f67b90248`. Bridge-only normalization is run
-34973444790 at harness `3bd4d5a4ca523b91dba400aefbd07e17f326ad32`; it passed
-200/204 executions and left the direct raw FP/UF case unresolved.
-
-Callback counts are not assertion counts or a global allocation bound. Traced
-single-run durations are not performance benchmarks. Production readiness requires
-further semantic/lifecycle proof, relevant upstream tests and measured efficiency.
+Earlier evidence: raw/broad run 34699671443; unwrap-only run 34973444790;
+repair comparison run 34976868892 at harness
+`5a24bc944f4de9ca547add74fb6328492f5c9f87`. In that comparison, raw and extended
+bridge passed all 220 classical checks. The bridge introduced an alternate-engine
+SAT model regression; static constructor normalization exhausted the rewrite-step
+limit on the second simplification. Neither alternative is carried forward here.

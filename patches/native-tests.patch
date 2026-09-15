@@ -1,0 +1,66 @@
+--- a/src/test/fpa.cpp
++++ b/src/test/fpa.cpp
+@@ -79,7 +79,63 @@
+     Z3_del_context(ctx);
+ }
+ 
++static void test_nan_congruence() {
++    char const* specs[] = {
++        "(declare-datatype Expr ((Flt (value (_ FloatingPoint 8 24)))))\n"
++        "(declare-const x Expr)\n"
++        "(assert (distinct x (Flt (_ NaN 8 24))))\n"
++        "(assert (fp.isNaN (value x)))\n",
++        "(declare-const p (_ BitVec 2))\n"
++        "(declare-const q (_ BitVec 2))\n"
++        "(declare-fun f ((_ FloatingPoint 3 3)) Int)\n"
++        "(assert (distinct p #b00))\n"
++        "(assert (distinct q #b00))\n"
++        "(assert (distinct p q))\n"
++        "(define-fun a () Int (f (fp #b0 #b111 p)))\n"
++        "(define-fun b () Int (f (fp #b1 #b111 q)))\n"
++        "(assert (or (= a 0) (= a 1)))\n"
++        "(assert (or (= b 0) (= b 1)))\n"
++        "(assert (distinct a b))\n"
++    };
++
++    for (unsigned relevancy = 0; relevancy <= 2; relevancy += 2) {
++        for (char const* spec : specs) {
++            Z3_config cfg = Z3_mk_config();
++            Z3_context ctx = Z3_mk_context(cfg);
++            Z3_del_config(cfg);
++            Z3_solver solver = Z3_mk_solver(ctx);
++            Z3_solver_inc_ref(ctx, solver);
++            Z3_params params = Z3_mk_params(ctx);
++            Z3_params_inc_ref(ctx, params);
++            Z3_params_set_bool(ctx, params, Z3_mk_string_symbol(ctx, "auto_config"), false);
++            Z3_params_set_uint(ctx, params, Z3_mk_string_symbol(ctx, "relevancy"), relevancy);
++            Z3_params_set_uint(ctx, params, Z3_mk_string_symbol(ctx, "case_split"), relevancy == 2 ? 3 : 1);
++            Z3_solver_set_params(ctx, solver, params);
++            Z3_params_dec_ref(ctx, params);
++            Z3_ast_vector assertions = Z3_parse_smtlib2_string(ctx, spec, 0, nullptr, nullptr, 0, nullptr, nullptr);
++            Z3_ast_vector_inc_ref(ctx, assertions);
++            unsigned count = Z3_ast_vector_size(ctx, assertions);
++            ENSURE(count > 0);
++            for (unsigned i = 0; i + 1 < count; ++i)
++                Z3_solver_assert(ctx, solver, Z3_ast_vector_get(ctx, assertions, i));
++            Z3_ast contradiction = Z3_ast_vector_get(ctx, assertions, count - 1);
++            Z3_solver_push(ctx, solver);
++            Z3_solver_assert(ctx, solver, contradiction);
++            ENSURE(Z3_solver_check(ctx, solver) == Z3_L_FALSE);
++            Z3_solver_pop(ctx, solver, 1);
++            ENSURE(Z3_solver_check(ctx, solver) == Z3_L_TRUE);
++            Z3_solver_push(ctx, solver);
++            Z3_solver_assert(ctx, solver, contradiction);
++            ENSURE(Z3_solver_check(ctx, solver) == Z3_L_FALSE);
++            Z3_ast_vector_dec_ref(ctx, assertions);
++            Z3_solver_dec_ref(ctx, solver);
++            Z3_del_context(ctx);
++        }
++    }
++}
++
+ void tst_fpa() {
++    test_nan_congruence();
+     test_rem_subnormal_divisor();
+     test_is_inf_large_significand();
+     test_significand_out_of_range();
