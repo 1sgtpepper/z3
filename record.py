@@ -9,7 +9,7 @@ import sys
 import time
 
 stage, source_arg, output_arg = sys.argv[1:]
-assert stage in {"baseline", "raw", "broad"}
+assert stage in {"baseline", "raw", "broad", "normalize"}
 source = Path(source_arg).resolve()
 output = Path(output_arg).resolve() / stage
 output.mkdir(parents=True, exist_ok=True)
@@ -78,4 +78,4 @@ for name, oracle in expected.items():
     "binary_sha256": hashlib.sha256(solver.read_bytes()).hexdigest(),
     "passed": sum(row["passed"] for row in rows), "total": len(rows),
 }, indent=2) + "\n")
-# The workflow evaluates both interventions only after every variant has run.
+# The workflow evaluates diagnostic outcomes only after every variant has run.

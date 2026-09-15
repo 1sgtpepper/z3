@@ -1,14 +1,21 @@
-# Issue 7842 raw NaN identity experiment
+# Issue 7842 normalized FP bridge experiment
 
-Compare unchanged Z3, a raw-node NaN identity rule, and the previous broad semantic
-implication at upstream `f85ec6c198b4ba8dd95c33005731f8a3a5c13f88`.
-The production source is checked out separately. Patches are applied only in CI.
-This branch contains diagnostic material and is not a proposed production fix.
+Compare unchanged Z3 with NaN normalization in the existing FP decode bridge at
+upstream `f85ec6c198b4ba8dd95c33005731f8a3a5c13f88`. The production source is
+checked out separately. Patches are applied only in CI. This branch contains
+diagnostic material and is not a proposed production fix.
 
-The raw rule asserts that a raw FP term with an all-ones exponent and nonzero
-significand equals its sort's NaN. The converter supplies the existing component
-predicate. The rule does not equate the source sign or payload bits. Existing
-nonraw bridges remain unchanged. The broad rule is a positive diagnostic control.
+The normalization patch changes `unwrap(b, s)` for FP sorts to select the NaN
+literal when its decoded FP value has an all-ones exponent and nonzero payload.
+It otherwise returns that decoded value. The existing bridge equality consumes
+the result; no new assertion site is added, and original BV inputs are unchanged.
+Direct raw FP terms bypass this bridge, so this experiment may remain incomplete.
+The separate SAT/EUF caller of `unwrap` is outside this execution matrix.
+
+The previous raw/broad diagnostic patches remain as historical inputs. Their
+completed comparison is pinned at harness `af7088aa037bb47ce18ed5056b5c2d3f67b90248`
+and run https://github.com/1sgtpepper/z3/actions/runs/34699671443 . They are not
+combined with the normalization patch or rerun in the current workflow.
 
 The 38 historical fixtures and their expected answers are preserved. Twelve
 additional SAT fixtures exercise independent raw NaN arguments and shared nested
@@ -22,12 +29,13 @@ through `f(raw_fp) = 0` applications. The witness `p = 1`, `q = 2`, and constant
 `f` satisfies it, while trace coverage requires actual FP registration. This closes
 the old round-trip SAT control's preprocessing bypass.
 
-Every variant runs all 51 fixtures in four configurations: 612 process records in
+Both variants run all 51 fixtures in four configurations: 408 process records in
 total. Debug builds run serially and reuse the configured build directory. Each
 process has a 30-second timeout; the job has a 60-minute timeout. The final gate
-checks both interventions only after collecting all three variants. Baseline
-failures are expected diagnostic data. No error, timeout, or unknown counts as a
-passing semantic result.
+checks record completeness and trace coverage, and rejects normalization errors,
+timeouts and unknowns. Wrong answers are reported as unresolved diagnostic data;
+a successful workflow does not mean normalization fixes every case. No error,
+timeout, unknown or wrong answer counts as a passing semantic result.
 
 An identical trace-only patch registers its tag in `util/trace_tags.def` and records
 effective relevancy and raw-node callbacks

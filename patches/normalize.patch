@@ -1,0 +1,12 @@
+--- a/src/ast/fpa/fpa2bv_converter.cpp
++++ b/src/ast/fpa/fpa2bv_converter.cpp
+@@ -4604,6 +4604,9 @@
+         res = m_util.mk_fp(m_bv_util.mk_extract(bv_sz - 1, bv_sz - 1, e),
+             m_bv_util.mk_extract(bv_sz - 2, sbits - 1, e),
+             m_bv_util.mk_extract(sbits - 2, 0, e));
++        expr_ref is_nan(m);
++        mk_is_nan(res, is_nan);
++        res = m.mk_ite(is_nan, m_util.mk_nan(s), res);
+     }
+ 
+     return res;
